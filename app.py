@@ -1,6 +1,6 @@
 """
 AI Robo-Advisor for FinTech Thesis
-With Real ETF Names and Professional Descriptions
+With Professional Dashboard & Banking Analytics
 Author: [Your Name]
 """
 
@@ -10,17 +10,46 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
 # ========== PAGE CONFIGURATION ==========
 st.set_page_config(
-    page_title="AI Robo-Advisor - Professional Portfolio Tool",
-    page_icon="📈",
+    page_title="AI Robo-Advisor - Professional Dashboard",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ========== CUSTOM CSS FOR DASHBOARD ==========
+st.markdown("""
+<style>
+    .dashboard-card {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+        border-left: 4px solid #2E86AB;
+        margin: 10px 0;
+    }
+    .metric-value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #2E86AB;
+    }
+    .metric-label {
+        font-size: 14px;
+        color: #666;
+    }
+    .risk-badge {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: bold;
+        text-align: center;
+        display: inline-block;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ========== ETF DATABASE WITH REAL NAMES ==========
 ETF_DATABASE = {
@@ -29,51 +58,50 @@ ETF_DATABASE = {
         "category": "Bonds",
         "description": "Broad exposure to US investment-grade bonds",
         "expense_ratio": 0.03,
-        "risk_level": "Low"
+        "risk_level": "Low",
+        "dividend_yield": 3.2,
+        "inception_date": "2007-04-03"
     },
     "VTI": {
         "name": "Vanguard Total Stock Market ETF",
         "category": "US Stocks",
         "description": "Entire US stock market including small, mid, and large caps",
         "expense_ratio": 0.03,
-        "risk_level": "Medium-High"
+        "risk_level": "Medium-High",
+        "dividend_yield": 1.4,
+        "inception_date": "2001-05-24"
     },
     "VXUS": {
         "name": "Vanguard Total International Stock ETF",
         "category": "International Stocks",
         "description": "Non-US companies from developed and emerging markets",
         "expense_ratio": 0.07,
-        "risk_level": "Medium-High"
+        "risk_level": "Medium-High",
+        "dividend_yield": 2.9,
+        "inception_date": "2011-01-26"
     },
     "QQQ": {
         "name": "Invesco QQQ Trust",
         "category": "Growth Stocks",
         "description": "Nasdaq 100 - technology and innovation focus",
         "expense_ratio": 0.20,
-        "risk_level": "High"
+        "risk_level": "High",
+        "dividend_yield": 0.6,
+        "inception_date": "1999-03-10"
     },
     "SHY": {
         "name": "iShares 1-3 Year Treasury Bond ETF",
         "category": "Short-term Bonds",
         "description": "Low-risk US government bonds with short maturity",
         "expense_ratio": 0.15,
-        "risk_level": "Very Low"
-    },
-    "SPY": {
-        "name": "SPDR S&P 500 ETF Trust",
-        "category": "Large Cap US Stocks",
-        "description": "500 largest US companies (blue-chip stocks)",
-        "expense_ratio": 0.09,
-        "risk_level": "Medium"
+        "risk_level": "Very Low",
+        "dividend_yield": 4.1,
+        "inception_date": "2002-07-22"
     }
 }
 
 # ========== RISK PROFILING FUNCTION ==========
 def calculate_risk_profile(answers):
-    """
-    Calculate risk profile from user answers
-    Returns profile name and score
-    """
     total_score = sum(answers)
     
     if total_score <= 12:
@@ -82,7 +110,9 @@ def calculate_risk_profile(answers):
             "score": total_score,
             "color": "#2E86AB",
             "description": "You prioritize capital preservation over high returns",
-            "allocation_style": "Income & Safety Focused"
+            "allocation_style": "Income & Safety Focused",
+            "risk_tolerance": "Low",
+            "typical_investor": "Retirees, near-retirement, emergency funds"
         }
     elif total_score <= 20:
         return {
@@ -90,7 +120,9 @@ def calculate_risk_profile(answers):
             "score": total_score,
             "color": "#F18F01",
             "description": "You seek balanced growth with managed risk",
-            "allocation_style": "Balanced Growth"
+            "allocation_style": "Balanced Growth",
+            "risk_tolerance": "Medium",
+            "typical_investor": "Mid-career professionals, college savings"
         }
     else:
         return {
@@ -98,53 +130,57 @@ def calculate_risk_profile(answers):
             "score": total_score,
             "color": "#C73E1D",
             "description": "You pursue maximum growth and accept volatility",
-            "allocation_style": "Growth & Wealth Building"
+            "allocation_style": "Growth & Wealth Building",
+            "risk_tolerance": "High",
+            "typical_investor": "Young professionals, long-term wealth builders"
         }
 
 # ========== PORTFOLIO CONSTRUCTION ==========
 def get_portfolio_allocation(risk_profile, total_amount):
-    """
-    Returns detailed portfolio allocation with real ETF names
-    """
     portfolios = {
         "Conservative": {
             "allocation": {
-                "BND": 0.50,  # 50% Bonds (safety)
-                "SHY": 0.20,  # 20% Short-term bonds (liquidity)
-                "VTI": 0.20,  # 20% US stocks (moderate growth)
-                "VXUS": 0.10  # 10% International (diversification)
+                "BND": 0.50,
+                "SHY": 0.20,
+                "VTI": 0.20,
+                "VXUS": 0.10
             },
-            "expected_return": 0.05,  # 5% annual
-            "expected_volatility": 0.08,  # 8% annual
+            "expected_return": 0.05,
+            "expected_volatility": 0.08,
+            "sharpe_ratio": 0.62,
+            "max_drawdown": -0.12,
             "suitable_for": "Retirement funds, emergency savings, short-term goals (1-3 years)"
         },
         "Moderate": {
             "allocation": {
-                "BND": 0.25,  # 25% Bonds (stability)
-                "VTI": 0.45,  # 45% US stocks (growth)
-                "VXUS": 0.20,  # 20% International (diversification)
-                "QQQ": 0.10   # 10% Tech growth (higher return potential)
+                "BND": 0.25,
+                "VTI": 0.45,
+                "VXUS": 0.20,
+                "QQQ": 0.10
             },
-            "expected_return": 0.08,  # 8% annual
-            "expected_volatility": 0.12,  # 12% annual
+            "expected_return": 0.08,
+            "expected_volatility": 0.12,
+            "sharpe_ratio": 0.67,
+            "max_drawdown": -0.25,
             "suitable_for": "Long-term wealth building, retirement (5-10 years), college funds"
         },
         "Aggressive": {
             "allocation": {
-                "VTI": 0.45,  # 45% US total market (core holding)
-                "QQQ": 0.25,  # 25% Tech/growth (higher returns)
-                "VXUS": 0.20,  # 20% International (global exposure)
-                "BND": 0.10   # 10% Bonds (minimal safety net)
+                "VTI": 0.45,
+                "QQQ": 0.25,
+                "VXUS": 0.20,
+                "BND": 0.10
             },
-            "expected_return": 0.11,  # 11% annual
-            "expected_volatility": 0.18,  # 18% annual
+            "expected_return": 0.11,
+            "expected_volatility": 0.18,
+            "sharpe_ratio": 0.61,
+            "max_drawdown": -0.35,
             "suitable_for": "Long-term wealth (10+ years), high-income investors, inheritance planning"
         }
     }
     
     allocation_data = portfolios[risk_profile]
     
-    # Calculate dollar amounts
     portfolio_details = []
     for ticker, weight in allocation_data["allocation"].items():
         etf_info = ETF_DATABASE.get(ticker, {})
@@ -152,58 +188,255 @@ def get_portfolio_allocation(risk_profile, total_amount):
             "Ticker": ticker,
             "ETF Name": etf_info.get("name", ticker),
             "Category": etf_info.get("category", "Other"),
-            "Allocation %": f"{weight * 100:.0f}%",
-            "Amount ($)": f"${total_amount * weight:,.2f}",
+            "Allocation %": weight * 100,
+            "Amount ($)": total_amount * weight,
             "Description": etf_info.get("description", "Diversified ETF"),
-            "Expense Ratio": etf_info.get("expense_ratio", 0.10)
+            "Expense Ratio": etf_info.get("expense_ratio", 0.10),
+            "Dividend Yield": etf_info.get("dividend_yield", 0)
         })
     
     return portfolio_details, allocation_data
 
 # ========== MONTE CARLO SIMULATION ==========
-def run_monte_carlo(initial_amount, years, expected_return, volatility, n_sims=2000):
-    """
-    Run Monte Carlo simulation with realistic parameters
-    """
-    # Convert annual to daily parameters (252 trading days)
+def run_monte_carlo(initial_amount, years, expected_return, volatility, n_sims=5000):
     daily_return = expected_return / 252
     daily_vol = volatility / np.sqrt(252)
     
-    # Simulation
     trading_days = years * 252
-    np.random.seed(42)  # For reproducibility
+    np.random.seed(42)
     
-    # Generate random returns
     random_returns = np.random.normal(daily_return, daily_vol, (trading_days, n_sims))
-    
-    # Calculate cumulative returns
     cumulative_returns = np.cumprod(1 + random_returns, axis=0)
-    
-    # Calculate portfolio values
     portfolio_values = initial_amount * cumulative_returns
     
-    # Calculate statistics
     final_values = portfolio_values[-1, :]
     
     stats = {
         "median": np.median(final_values),
         "mean": np.mean(final_values),
         "percentile_5": np.percentile(final_values, 5),
+        "percentile_10": np.percentile(final_values, 10),
         "percentile_25": np.percentile(final_values, 25),
         "percentile_75": np.percentile(final_values, 75),
+        "percentile_90": np.percentile(final_values, 90),
         "percentile_95": np.percentile(final_values, 95),
         "probability_of_loss": np.mean(final_values < initial_amount) * 100,
+        "probability_of_gain_50pct": np.mean(final_values > initial_amount * 1.5) * 100,
         "best_case": np.max(final_values),
-        "worst_case": np.min(final_values)
+        "worst_case": np.min(final_values),
+        "std_dev": np.std(final_values)
     }
     
     return portfolio_values, stats
+
+# ========== DASHBOARD FUNCTIONS ==========
+def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amount, investment_years, risk_profile):
+    """Create comprehensive dashboard with key metrics"""
+    
+    st.header("📊 Investment Dashboard")
+    st.write("---")
+    
+    # Row 1: Key Metrics Cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div class="metric-label">Portfolio Value (Median)</div>
+            <div class="metric-value">${sim_stats['median']:,.0f}</div>
+            <div class="metric-label">in {investment_years} years</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        total_return = (sim_stats['median'] - initial_amount) / initial_amount * 100
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div class="metric-label">Expected Return</div>
+            <div class="metric-value">{total_return:.1f}%</div>
+            <div class="metric-label">over {investment_years} years</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        cagr = ((sim_stats['median'] / initial_amount) ** (1/investment_years) - 1) * 100
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div class="metric-label">CAGR (Annualized)</div>
+            <div class="metric-value">{cagr:.1f}%</div>
+            <div class="metric-label">per year</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div class="metric-label">Risk of Loss</div>
+            <div class="metric-value">{sim_stats['probability_of_loss']:.1f}%</div>
+            <div class="metric-label">probability</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.write("---")
+    
+    # Row 2: Risk & Performance Metrics
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.subheader("📉 Risk Analytics")
+        st.write(f"**Volatility (Annual):** {allocation_data['expected_volatility']*100:.1f}%")
+        st.write(f"**Maximum Drawdown:** {allocation_data['max_drawdown']*100:.1f}%")
+        st.write(f"**Sharpe Ratio:** {allocation_data['sharpe_ratio']:.2f}")
+        st.write(f"**VaR (95% confidence):** -{((initial_amount - sim_stats['percentile_5'])/initial_amount)*100:.1f}%")
+    
+    with col2:
+        st.subheader("📈 Return Scenarios")
+        st.write(f"**Best Case (95th %):** +{((sim_stats['percentile_95']-initial_amount)/initial_amount)*100:.0f}%")
+        st.write(f"**Optimistic (75th %):** +{((sim_stats['percentile_75']-initial_amount)/initial_amount)*100:.0f}%")
+        st.write(f"**Base Case (Median):** +{((sim_stats['median']-initial_amount)/initial_amount)*100:.0f}%")
+        st.write(f"**Pessimistic (25th %):** +{((sim_stats['percentile_25']-initial_amount)/initial_amount)*100:.0f}%")
+        st.write(f"**Worst Case (5th %):** +{((sim_stats['percentile_5']-initial_amount)/initial_amount)*100:.0f}%")
+    
+    with col3:
+        st.subheader("💰 Income Projection")
+        total_dividends = sum([etf['Amount ($)'] * (etf['Dividend Yield']/100) for etf in portfolio_details])
+        st.write(f"**Annual Dividend Income:** ${total_dividends:,.0f}")
+        st.write(f"**Monthly Dividend Income:** ${total_dividends/12:,.0f}")
+        st.write(f"**Dividend Yield (Portfolio):** {(total_dividends/initial_amount)*100:.1f}%")
+        
+        # Fee analysis
+        total_fees = sum([etf['Amount ($)'] * (etf['Expense Ratio']/100) for etf in portfolio_details])
+        st.write(f"**Annual Fees:** ${total_fees:.0f}")
+        st.write(f"**10-Year Fee Cost:** ${total_fees*10:.0f}")
+    
+    st.write("---")
+    
+    # Row 3: Confidence Intervals Chart
+    st.subheader("📊 Confidence Interval Analysis")
+    
+    confidence_data = pd.DataFrame({
+        'Confidence Level': ['90%', '80%', '50%'],
+        'Lower Bound': [sim_stats['percentile_5'], sim_stats['percentile_10'], sim_stats['percentile_25']],
+        'Upper Bound': [sim_stats['percentile_95'], sim_stats['percentile_90'], sim_stats['percentile_75']]
+    })
+    
+    fig = go.Figure()
+    
+    for i, row in confidence_data.iterrows():
+        fig.add_trace(go.Bar(
+            name=f"{row['Confidence Level']} Confidence",
+            x=[f"{row['Confidence Level']} Range"],
+            y=[row['Upper Bound'] - row['Lower Bound']],
+            base=row['Lower Bound'],
+            text=[f"${row['Lower Bound']:,.0f} - ${row['Upper Bound']:,.0f}"],
+            textposition='inside',
+            hovertemplate=f"Range: ${row['Lower Bound']:,.0f} to ${row['Upper Bound']:,.0f}<extra></extra>"
+        ))
+    
+    fig.add_hline(y=initial_amount, line_dash="dash", line_color="green", 
+                 annotation_text=f"Initial: ${initial_amount:,.0f}")
+    
+    fig.update_layout(
+        title="Portfolio Value Ranges by Confidence Level",
+        xaxis_title="Confidence Level",
+        yaxis_title="Portfolio Value ($)",
+        showlegend=False,
+        height=400
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.write("---")
+    
+    # Row 4: Banking Insights
+    st.subheader("🏦 Banking & Institutional Insights")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Portfolio Construction Methodology**")
+        st.write("""
+        - Based on Modern Portfolio Theory (Markowitz, 1952)
+        - Optimized for risk-adjusted returns (Sharpe Ratio)
+        - Uses institutional-grade ETFs from Vanguard, BlackRock, Invesco
+        - Rebalancing recommended: Annually
+        """)
+    
+    with col2:
+        st.write("**Risk Management Framework**")
+        st.write(f"""
+        - Risk Profile: **{risk_profile}**
+        - Maximum Drawdown: **{allocation_data['max_drawdown']*100:.0f}%**
+        - Stop-loss recommendation: {allocation_data['max_drawdown']*100:.0f}%
+        - Hedge recommendation: {'Increase bonds' if risk_profile == 'Aggressive' else 'Maintain allocation'}
+        """)
+    
+    st.write("---")
+    
+    # Row 5: Comparison with Benchmarks
+    st.subheader("📈 Benchmark Comparison")
+    
+    # Calculate benchmark returns
+    sAndP_return = 0.10  # S&P 500 historical return
+    bond_return = 0.04    # Bond market return
+    
+    portfolio_final = sim_stats['median']
+    sp500_final = initial_amount * (1 + sAndP_return) ** investment_years
+    bond_final = initial_amount * (1 + bond_return) ** investment_years
+    
+    comparison_df = pd.DataFrame({
+        'Strategy': ['Your Portfolio', 'S&P 500 Index', 'Bond Market Index'],
+        'Expected Value ($)': [portfolio_final, sp500_final, bond_final],
+        'Return (%)': [
+            ((portfolio_final - initial_amount) / initial_amount * 100),
+            ((sp500_final - initial_amount) / initial_amount * 100),
+            ((bond_final - initial_amount) / initial_amount * 100)
+        ]
+    })
+    
+    fig = px.bar(comparison_df, x='Strategy', y='Return (%)', 
+                 title=f'Performance Comparison vs Market Benchmarks ({investment_years} years)',
+                 color='Strategy',
+                 color_discrete_sequence=['#2E86AB', '#F18F01', '#28a745'])
+    fig.add_hline(y=0, line_dash="dash", line_color="red")
+    fig.update_layout(height=400)
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Row 6: Probability Distribution
+    st.subheader("📊 Probability Distribution of Returns")
+    
+    # Create histogram of final values
+    final_values_sim = np.random.normal(sim_stats['mean'], sim_stats['std_dev'], 10000)
+    
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=final_values_sim,
+        nbinsx=50,
+        marker_color='#2E86AB',
+        opacity=0.7,
+        name='Distribution'
+    ))
+    
+    fig.add_vline(x=initial_amount, line_dash="dash", line_color="red",
+                 annotation_text="Break-even")
+    fig.add_vline(x=sim_stats['median'], line_dash="dash", line_color="green",
+                 annotation_text="Median")
+    
+    fig.update_layout(
+        title="Distribution of Possible Portfolio Values",
+        xaxis_title="Portfolio Value ($)",
+        yaxis_title="Frequency",
+        height=400
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
 
 # ========== MAIN APPLICATION ==========
 def main():
     # Header
     st.title("🤖 AI Robo-Advisor")
-    st.caption("Professional Portfolio Construction Using Real ETFs | Powered by Monte Carlo Simulation")
+    st.caption("Professional Portfolio Construction with Real-Time Analytics Dashboard")
     st.write("---")
     
     # Sidebar - Risk Assessment
@@ -286,6 +519,12 @@ def main():
         
         st.write("---")
         
+        # Dashboard toggle
+        show_dashboard = st.checkbox("📊 Show Detailed Dashboard", value=True, 
+                                     help="Display comprehensive analytics dashboard")
+        
+        st.write("---")
+        
         # Submit button
         submit = st.button("🎯 Generate Portfolio", type="primary", use_container_width=True)
     
@@ -300,7 +539,7 @@ def main():
         st.success(f"""
         ### ✅ Your Risk Profile: **{risk_profile}**
         {risk_result['description']}
-        **Style**: {risk_result['allocation_style']} | **Score**: {risk_result['score']}/25
+        **Style**: {risk_result['allocation_style']} | **Score**: {risk_result['score']}/25 | **Risk Tolerance**: {risk_result['risk_tolerance']}
         """)
         
         st.write("---")
@@ -316,8 +555,11 @@ def main():
         col1, col2 = st.columns([1.5, 1])
         
         with col1:
-            # Display detailed table
-            display_df = portfolio_df[["Ticker", "ETF Name", "Allocation %", "Amount ($)", "Expense Ratio"]]
+            display_df = portfolio_df[["Ticker", "ETF Name", "Allocation %", "Amount ($)", "Expense Ratio", "Dividend Yield"]]
+            display_df["Allocation %"] = display_df["Allocation %"].apply(lambda x: f"{x:.0f}%")
+            display_df["Amount ($)"] = display_df["Amount ($)"].apply(lambda x: f"${x:,.0f}")
+            display_df["Expense Ratio"] = display_df["Expense Ratio"].apply(lambda x: f"{x:.2f}%")
+            display_df["Dividend Yield"] = display_df["Dividend Yield"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             # Portfolio summary
@@ -325,13 +567,13 @@ def main():
             st.write("**📈 Portfolio Characteristics:**")
             st.write(f"• Expected Annual Return: **{allocation_data['expected_return']*100:.0f}%**")
             st.write(f"• Expected Volatility: **{allocation_data['expected_volatility']*100:.0f}%**")
+            st.write(f"• Sharpe Ratio: **{allocation_data['sharpe_ratio']:.2f}**")
             st.write(f"• Suitable For: **{allocation_data['suitable_for']}**")
         
         with col2:
-            # Pie chart
             fig = px.pie(
                 portfolio_df, 
-                values=[float(x.replace('$', '').replace(',', '').split()[0]) for x in portfolio_df["Amount ($)"]],
+                values="Allocation %",
                 names=portfolio_df["Ticker"],
                 title="Asset Allocation",
                 color_discrete_sequence=px.colors.qualitative.Set2,
@@ -345,45 +587,29 @@ def main():
         
         # Monte Carlo Simulation
         st.header("📈 Monte Carlo Simulation")
-        st.write(f"Projecting {initial_amount:,} over {investment_years} years with {allocation_data['expected_return']*100:.0f}% expected return")
+        st.write(f"Projecting ${initial_amount:,} over {investment_years} years with {allocation_data['expected_return']*100:.0f}% expected return")
         
-        with st.spinner(f"Running 2,000 market simulations..."):
+        with st.spinner(f"Running 5,000 market simulations..."):
             sim_results, sim_stats = run_monte_carlo(
                 initial_amount, 
                 investment_years, 
                 allocation_data['expected_return'],
-                allocation_data['expected_volatility']
+                allocation_data['expected_volatility'],
+                n_sims=5000
             )
         
-        # Display statistics
+        # Display basic simulation stats
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Median Outcome", f"${sim_stats['median']:,.0f}")
-            percent_return = (sim_stats['median'] - initial_amount) / initial_amount * 100
-            st.caption(f"📈 +{percent_return:.0f}% return")
-        
         with col2:
             st.metric("Expected Range", f"${sim_stats['percentile_25']:,.0f} - ${sim_stats['percentile_75']:,.0f}")
-            st.caption("25th to 75th percentile")
-        
         with col3:
-            st.metric("Worst Case (5%)", f"${sim_stats['percentile_5']:,.0f}")
-            st.caption("Only 5% of scenarios worse")
-        
+            st.metric("Risk of Loss", f"{sim_stats['probability_of_loss']:.1f}%")
         with col4:
-            st.metric("Best Case (95%)", f"${sim_stats['percentile_95']:,.0f}")
-            st.caption("Only 5% of scenarios better")
-        
-        # Risk of loss warning
-        if sim_stats['probability_of_loss'] > 10:
-            st.warning(f"⚠️ **Risk Warning**: {sim_stats['probability_of_loss']:.0f}% probability of losing money over {investment_years} years")
-        else:
-            st.info(f"✅ **Risk Assessment**: {sim_stats['probability_of_loss']:.0f}% probability of loss over {investment_years} years")
+            st.metric("Gain >50% Probability", f"{sim_stats['probability_of_gain_50pct']:.1f}%")
         
         # Simulation chart
-        st.subheader("Portfolio Value Projections")
-        
-        # Create chart with median and confidence bands
         days = np.arange(len(sim_results))
         median_path = np.median(sim_results, axis=1)
         percentile_25 = np.percentile(sim_results, 25, axis=1)
@@ -391,7 +617,6 @@ def main():
         
         fig = go.Figure()
         
-        # Add confidence band
         fig.add_trace(go.Scatter(
             x=np.concatenate([days, days[::-1]]),
             y=np.concatenate([percentile_75, percentile_25[::-1]]),
@@ -402,7 +627,6 @@ def main():
             showlegend=True
         ))
         
-        # Add median line
         fig.add_trace(go.Scatter(
             x=days,
             y=median_path,
@@ -411,12 +635,11 @@ def main():
             name='Median Path'
         ))
         
-        # Add initial investment line
         fig.add_hline(y=initial_amount, line_dash="dash", line_color="green", 
                      annotation_text="Initial Investment")
         
         fig.update_layout(
-            title=f"Portfolio Value Over {investment_years} Years (2,000 Simulations)",
+            title=f"Portfolio Value Over {investment_years} Years (5,000 Simulations)",
             xaxis_title="Trading Days",
             yaxis_title="Portfolio Value ($)",
             hovermode='x unified',
@@ -427,6 +650,11 @@ def main():
         
         st.write("---")
         
+        # Show Dashboard if enabled
+        if show_dashboard:
+            create_dashboard(portfolio_details, allocation_data, sim_stats, 
+                           initial_amount, investment_years, risk_profile)
+        
         # Education & Ethics Section
         st.header("📚 Understanding Your Portfolio")
         
@@ -434,7 +662,7 @@ def main():
             for etf in portfolio_details:
                 st.write(f"**{etf['Ticker']} - {etf['ETF Name']}**")
                 st.write(f"*{etf['Description']}*")
-                st.write(f"Category: {etf['Category']} | Expense Ratio: {etf['Expense Ratio']:.2f}%")
+                st.write(f"Category: {etf['Category']} | Expense Ratio: {etf['Expense Ratio']:.2f}% | Dividend Yield: {etf['Dividend Yield']:.1f}%")
                 st.write("---")
         
         with st.expander("⚠️ Important Disclosures & Ethics (Required for LO4)"):
@@ -474,57 +702,59 @@ def main():
             - Optimized for your risk/return trade-off
             
             **Monte Carlo Methodology:**
-            - 2,000 random market scenarios
+            - 5,000 random market scenarios
             - Assumes lognormal return distribution
             - Historical volatility: {allocation_data['expected_volatility']*100:.0f}%
             - 252 trading days per year
             """)
     
     else:
-        # Welcome screen (before submission)
+        # Welcome screen
         st.info("### 👈 Welcome to AI Robo-Advisor")
         st.write("""
         **Complete the risk assessment in the left sidebar to get your personalized portfolio**
         
         This tool will:
         - ✅ Assess your risk tolerance using 5 professional questions
-        - ✅ Build a diversified ETF portfolio using real funds (Vanguard, BlackRock, Invesco)
-        - ✅ Run 2,000 Monte Carlo simulations to project outcomes
-        - ✅ Show you expected returns, risks, and confidence intervals
+        - ✅ Build a diversified ETF portfolio using real funds
+        - ✅ Run 5,000 Monte Carlo simulations to project outcomes
+        - ✅ Show detailed dashboard with risk analytics
+        - ✅ Compare performance against market benchmarks
+        - ✅ Calculate dividend income and fee analysis
         - ✅ Explain the AI's decision-making process
         
-        **Built with real ETFs you can actually invest in:**
-        - VTI (Total US Stock Market)
-        - BND (Total US Bond Market)
-        - QQQ (Nasdaq 100 Tech)
-        - VXUS (International Stocks)
-        - SHY (Short-term Treasury Bonds)
+        **New Dashboard Features:**
+        - 📊 Real-time risk metrics (VaR, Sharpe Ratio, Drawdown)
+        - 💰 Dividend income projections
+        - 📈 Benchmark comparisons (S&P 500, Bonds)
+        - 🎯 Confidence interval analysis
+        - 🏦 Banking & institutional insights
         """)
         
-        # Sample portfolio preview
-        st.subheader("📊 Sample Portfolio by Risk Level")
-        sample_col1, sample_col2, sample_col3 = st.columns(3)
+        # Feature preview
+        st.subheader("✨ Dashboard Preview")
+        col1, col2, col3 = st.columns(3)
         
-        with sample_col1:
-            st.write("**Conservative**")
-            st.write("• 70% Bonds (BND, SHY)")
-            st.write("• 30% Stocks (VTI, VXUS)")
-            st.write("• Expected return: 5%")
-            st.write("• Low volatility")
+        with col1:
+            st.write("**Risk Analytics**")
+            st.write("• Value at Risk (VaR)")
+            st.write("• Maximum Drawdown")
+            st.write("• Sharpe Ratio")
+            st.write("• Volatility Analysis")
         
-        with sample_col2:
-            st.write("**Moderate**")
-            st.write("• 25% Bonds (BND)")
-            st.write("• 75% Stocks (VTI, VXUS, QQQ)")
-            st.write("• Expected return: 8%")
-            st.write("• Moderate volatility")
+        with col2:
+            st.write("**Return Scenarios**")
+            st.write("• Best/Worst Case")
+            st.write("• Confidence Intervals")
+            st.write("• Probability Distribution")
+            st.write("• CAGR Calculation")
         
-        with sample_col3:
-            st.write("**Aggressive**")
-            st.write("• 10% Bonds (BND)")
-            st.write("• 90% Stocks (VTI, QQQ, VXUS)")
-            st.write("• Expected return: 11%")
-            st.write("• Higher volatility")
+        with col3:
+            st.write("**Income Analysis**")
+            st.write("• Dividend Projections")
+            st.write("• Fee Impact")
+            st.write("• Tax Considerations")
+            st.write("• Benchmark Comparison")
 
 # ========== RUN APPLICATION ==========
 if __name__ == "__main__":

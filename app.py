@@ -2,7 +2,7 @@
 # Author: [Syed Kamran Abbas]
 #Date: June 2026
 
-
+from risk_questions import RiskProfiler
 # ========== IMPORT LIBRARIES ==========
 import streamlit as st
 import pandas as pd
@@ -162,34 +162,10 @@ def main():
         st.markdown("Answer the following questions honestly:")
         st.markdown("---")
         
-        # Questions (1-5 scale: 1=Very Low Risk, 5=Very High Risk)
-        q1 = st.slider("1️⃣ Investment horizon (years)", 
-                       min_value=1, max_value=30, value=10,
-                       help="Longer horizon allows more risk")
-        
-        q2 = st.select_slider("2️⃣ How would you react to a 20% market drop?",
-                              options=["Sell everything", "Get nervous", "Do nothing", 
-                                      "Buy more", "Aggressively buy more"],
-                              value="Do nothing")
-        q2_score = ["Sell everything", "Get nervous", "Do nothing", 
-                   "Buy more", "Aggressively buy more"].index(q2) + 1
-        
-        q3 = st.radio("3️⃣ Your investment goal is:",
-                     ["Capital preservation", "Income", "Balanced", 
-                      "Growth", "Aggressive growth"],
-                     index=2)
-        q3_score = ["Capital preservation", "Income", "Balanced", 
-                   "Growth", "Aggressive growth"].index(q3) + 1
-        
-        q4 = st.slider("4️⃣ What % of your savings would you invest?", 
-                       min_value=0, max_value=100, value=50,
-                       help="Higher percentage = higher risk tolerance")
-        q4_score = q4 // 20 + 1  # Convert to 1-5 scale
-        
-        q5 = st.select_slider("5️⃣ Expected annual return target:",
-                              options=["3-4%", "5-6%", "7-8%", "9-10%", "11%+"],
-                              value="7-8%")
-        q5_score = ["3-4%", "5-6%", "7-8%", "9-10%", "11%+"].index(q5) + 1
+       # In the sidebar section, replace all questions with:
+answers = RiskProfiler.display_questionnaire()
+risk_result = RiskProfiler.get_risk_profile(answers)
+risk_profile = risk_result['profile']
         
         # Investment amount
         st.markdown("---")

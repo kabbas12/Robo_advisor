@@ -1,7 +1,7 @@
 """
 AI Robo-Advisor for FinTech Thesis
 With Professional Dashboard & Banking Analytics
-Author: [Your Name]
+Author: Syed Kamran Abbas 
 """
 
 # ========== IMPORT LIBRARIES ==========

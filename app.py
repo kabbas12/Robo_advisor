@@ -604,36 +604,6 @@ def plot_golden_death_cross_graph_enhanced(df, ticker):
                             textfont=dict(size=20, family='Arial Black'),
                             hovertemplate="<b>Death Cross</b><br>Date: %{x}<br>Price: $%{y:.2f}<extra></extra>"))
     
-    # Add shaded regions - MORE VISIBLE
-    # Bullish zone (MA20 > MA50)
-    for i in range(len(df) - 1):
-        if df['MA_Short'].iloc[i] > df['MA_Long'].iloc[i]:
-            # Find continuous bullish period
-            start_idx = df.index[i]
-            end_idx = df.index[i]
-            j = i + 1
-            while j < len(df) and df['MA_Short'].iloc[j] > df['MA_Long'].iloc[j]:
-                end_idx = df.index[j]
-                j += 1
-            if start_idx != end_idx:
-                fig.add_vrect(x0=start_idx, x1=end_idx, fillcolor="rgba(46, 204, 113, 0.2)",
-                             layer="below", line_width=0)
-            i = j - 1
-    
-    # Bearish zone (MA20 < MA50)
-    for i in range(len(df) - 1):
-        if df['MA_Short'].iloc[i] < df['MA_Long'].iloc[i]:
-            start_idx = df.index[i]
-            end_idx = df.index[i]
-            j = i + 1
-            while j < len(df) and df['MA_Short'].iloc[j] < df['MA_Long'].iloc[j]:
-                end_idx = df.index[j]
-                j += 1
-            if start_idx != end_idx:
-                fig.add_vrect(x0=start_idx, x1=end_idx, fillcolor="rgba(231, 76, 60, 0.2)",
-                             layer="below", line_width=0)
-            i = j - 1
-    
     # Update layout with better formatting
     current_trend = "Bullish (Golden Cross Active)" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "Bearish (Death Cross Active)"
     
@@ -731,129 +701,241 @@ def plot_portfolio_macd_comparison(all_macd_data, portfolio_details):
     
     return fig
 
-def plot_portfolio_cross_comparison(all_cross_data, portfolio_details):
-    """Plot Golden/Death Cross time-series line graph for all portfolio holdings"""
+def plot_portfolio_cross_comparison_enhanced(all_cross_data, portfolio_details, price_data):
+    """
+    Enhanced Golden/Death Cross visualization for all portfolio holdings.
+    Shows each security in a separate subplot with price, moving averages, and cross markers.
+    """
+    # Determine number of securities
+    n_securities = len(portfolio_details)
+    n_rows = (n_securities + 1) // 2  # 2 columns
+    
+    # Create subplot grid
+    fig = make_subplots(
+        rows=n_rows, 
+        cols=2,
+        subplot_titles=[f"{h['Ticker']} - {h['ETF Name'][:20]}" for h in portfolio_details],
+        vertical_spacing=0.08,
+        horizontal_spacing=0.05
+    )
+    
+    # Get colors for each security
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+              '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    
+    # Process each security
+    for idx, holding in enumerate(portfolio_details):
+        ticker = holding['Ticker']
+        row = idx // 2 + 1
+        col = idx % 2 + 1
+        
+        # Get data for this ticker
+        if ticker in price_data:
+            df = price_data[ticker]
+            
+            if df is not None and not df.empty:
+                # Price line
+                fig.add_trace(
+                    go.Scatter(
+                        x=df.index, 
+                        y=df['Close'],
+                        mode='lines',
+                        name=f'{ticker} Price',
+                        line=dict(color=colors[idx % len(colors)], width=2.5),
+                        showlegend=False
+                    ),
+                    row=row, col=col
+                )
+                
+                # Short MA (20-day)
+                fig.add_trace(
+                    go.Scatter(
+                        x=df.index, 
+                        y=df['MA_Short'],
+                        mode='lines',
+                        name=f'{ticker} MA20',
+                        line=dict(color='#F39C12', width=2, dash='dash'),
+                        showlegend=False
+                    ),
+                    row=row, col=col
+                )
+                
+                # Long MA (50-day)
+                fig.add_trace(
+                    go.Scatter(
+                        x=df.index, 
+                        y=df['MA_Long'],
+                        mode='lines',
+                        name=f'{ticker} MA50',
+                        line=dict(color='#8E44AD', width=2, dash='dash'),
+                        showlegend=False
+                    ),
+                    row=row, col=col
+                )
+                
+                # Golden Cross markers (BUY)
+                golden_crosses = df[df['Golden_Cross'] == True]
+                if not golden_crosses.empty:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=golden_crosses.index,
+                            y=golden_crosses['Close'],
+                            mode='markers',
+                            name=f'{ticker} Golden Cross',
+                            marker=dict(
+                                symbol='triangle-up',
+                                size=18,
+                                color='#27AE60',
+                                line=dict(color='#1E8449', width=3)
+                            ),
+                            hovertemplate=f"<b>{ticker} - Golden Cross</b><br>Date: %{{x}}<br>Price: $%{{y:.2f}}<extra></extra>",
+                            showlegend=False
+                        ),
+                        row=row, col=col
+                    )
+                
+                # Death Cross markers (SELL)
+                death_crosses = df[df['Death_Cross'] == True]
+                if not death_crosses.empty:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=death_crosses.index,
+                            y=death_crosses['Close'],
+                            mode='markers',
+                            name=f'{ticker} Death Cross',
+                            marker=dict(
+                                symbol='triangle-down',
+                                size=18,
+                                color='#E74C3C',
+                                line=dict(color='#B03A2E', width=3)
+                            ),
+                            hovertemplate=f"<b>{ticker} - Death Cross</b><br>Date: %{{x}}<br>Price: $%{{y:.2f}}<extra></extra>",
+                            showlegend=False
+                        ),
+                        row=row, col=col
+                    )
+                
+                # Add current trend annotation
+                current_trend = "🟢 Bullish" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "🔴 Bearish"
+                allocation = holding['Allocation %']
+                
+                fig.add_annotation(
+                    x=0.02,
+                    y=0.95,
+                    xref=f"x{idx+1} domain",
+                    yref=f"y{idx+1} domain",
+                    text=f"{current_trend}<br>Alloc: {allocation:.1f}%",
+                    showarrow=False,
+                    font=dict(size=10, color="white"),
+                    bgcolor="#2C3E50" if "Bullish" in current_trend else "#C0392B",
+                    opacity=0.8,
+                    bordercolor="black",
+                    borderwidth=1,
+                    borderpad=4
+                )
+    
+    # Update layout
+    fig.update_layout(
+        title="🟡 Golden vs 🔴 Death Cross Analysis - All Portfolio Holdings",
+        height=300 * n_rows + 150,
+        showlegend=False,
+        hovermode='x unified',
+        font=dict(size=11),
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    )
+    
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f0f0f0', tickangle=45)
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f0f0f0')
+    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+    
+    return fig
+
+def plot_portfolio_cross_summary(all_cross_data, portfolio_details):
+    """
+    Create a summary visualization showing cross counts and current status for each security.
+    """
+    # Combine all cross data
+    combined_cross = pd.concat(all_cross_data, ignore_index=True) if all_cross_data else pd.DataFrame()
+    
+    # Create summary dataframe
+    summary_data = []
+    for holding in portfolio_details:
+        ticker = holding['Ticker']
+        
+        # Get cross counts for this ticker
+        if not combined_cross.empty:
+            ticker_crosses = combined_cross[combined_cross['Ticker'] == ticker]
+            golden_count = len(ticker_crosses[ticker_crosses['Type'] == '🟢 Golden Cross (BUY)'])
+            death_count = len(ticker_crosses[ticker_crosses['Type'] == '🔴 Death Cross (SELL)'])
+        else:
+            golden_count = 0
+            death_count = 0
+        
+        summary_data.append({
+            'Ticker': ticker,
+            'ETF Name': holding['ETF Name'][:25],
+            'Allocation %': holding['Allocation %'],
+            'Golden Crosses': golden_count,
+            'Death Crosses': death_count,
+            'Net Signal': golden_count - death_count,
+            'Status': '🟢 Bullish' if golden_count > death_count else '🔴 Bearish' if death_count > golden_count else '⚪ Neutral'
+        })
+    
+    summary_df = pd.DataFrame(summary_data)
+    
+    # Create the visualization
     fig = go.Figure()
     
-    # Combine all cross data
-    combined_cross = pd.concat(all_cross_data, ignore_index=True)
+    # Add bars for Golden Crosses
+    fig.add_trace(go.Bar(
+        x=summary_df['Ticker'],
+        y=summary_df['Golden Crosses'],
+        name='🟢 Golden Crosses (BUY)',
+        marker_color='#27AE60',
+        text=summary_df['Golden Crosses'],
+        textposition='outside',
+        hovertemplate="<b>%{x}</b><br>Golden Crosses: %{y}<extra></extra>"
+    ))
     
-    if not combined_cross.empty:
-        # Convert Date to datetime
-        combined_cross['Date'] = pd.to_datetime(combined_cross['Date'])
-        
-        # Sort by date
-        combined_cross = combined_cross.sort_values('Date')
-        
-        # Get unique tickers
-        unique_tickers = combined_cross['Ticker'].unique()
-        
-        # Use distinct colors for each ticker
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-        color_map = {ticker: colors[i % len(colors)] for i, ticker in enumerate(unique_tickers)}
-        
-        # Separate Golden and Death crosses for each ticker
-        for ticker in unique_tickers:
-            ticker_data = combined_cross[combined_cross['Ticker'] == ticker]
-            
-            # Get allocation for this ticker
-            allocation = next((h['Allocation %'] for h in portfolio_details if h['Ticker'] == ticker), 0)
-            
-            # Golden Crosses (BUY signals)
-            golden_data = ticker_data[ticker_data['Type'] == '🟢 Golden Cross (BUY)']
-            if not golden_data.empty:
-                fig.add_trace(go.Scatter(
-                    x=golden_data['Date'],
-                    y=[1] * len(golden_data),  # Y=1 for Golden Cross
-                    mode='markers+lines',
-                    name=f"{ticker} Golden (BUY)",
-                    line=dict(color=color_map[ticker], width=2.5, dash='solid'),
-                    marker=dict(
-                        symbol='triangle-up',
-                        size=18,
-                        color='#27AE60',
-                        line=dict(color='#1E8449', width=3)
-                    ),
-                    text=[f"🟢 Golden Cross" for _ in range(len(golden_data))],
-                    hovertemplate=f"<b>{ticker}</b><br>%{{text}}<br>Date: %{{x|%Y-%m-%d}}<br>Price: $%{{customdata:.2f}}<br>Allocation: {allocation:.1f}%<extra></extra>",
-                    customdata=golden_data['Price at Signal']
-                ))
-            
-            # Death Crosses (SELL signals)
-            death_data = ticker_data[ticker_data['Type'] == '🔴 Death Cross (SELL)']
-            if not death_data.empty:
-                fig.add_trace(go.Scatter(
-                    x=death_data['Date'],
-                    y=[0] * len(death_data),  # Y=0 for Death Cross
-                    mode='markers+lines',
-                    name=f"{ticker} Death (SELL)",
-                    line=dict(color=color_map[ticker], width=2.5, dash='dot'),
-                    marker=dict(
-                        symbol='triangle-down',
-                        size=18,
-                        color='#E74C3C',
-                        line=dict(color='#B03A2E', width=3)
-                    ),
-                    text=[f"🔴 Death Cross" for _ in range(len(death_data))],
-                    hovertemplate=f"<b>{ticker}</b><br>%{{text}}<br>Date: %{{x|%Y-%m-%d}}<br>Price: $%{{customdata:.2f}}<br>Allocation: {allocation:.1f}%<extra></extra>",
-                    customdata=death_data['Price at Signal']
-                ))
-        
-        # Add horizontal reference lines
-        fig.add_hline(y=1, line_dash="dash", line_color="#27AE60", opacity=0.3, 
-                     annotation_text="Golden Cross Zone", annotation_position="top right")
-        fig.add_hline(y=0, line_dash="dash", line_color="#E74C3C", opacity=0.3,
-                     annotation_text="Death Cross Zone", annotation_position="bottom right")
-        
-        # Add summary annotation
-        total_golden = len(combined_cross[combined_cross['Type'] == '🟢 Golden Cross (BUY)'])
-        total_death = len(combined_cross[combined_cross['Type'] == '🔴 Death Cross (SELL)'])
-        
-        fig.add_annotation(
-            x=0.02, y=0.98,
-            xref="paper", yref="paper",
-            text=f"<b>📊 Summary</b><br>🟢 Golden Crosses: {total_golden}<br>🔴 Death Crosses: {total_death}",
-            showarrow=False,
-            font=dict(size=12, color="white"),
-            bgcolor="#2C3E50",
-            opacity=0.85,
-            bordercolor="black",
-            borderwidth=2,
-            borderpad=8,
-            align="left"
-        )
-        
-        fig.update_layout(
-            title="🟡 Golden vs 🔴 Death Cross Time-Series - All Holdings",
-            xaxis_title="Date",
-            yaxis_title="Signal Type",
-            height=500,
-            hovermode='x unified',
-            font=dict(size=12),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                font=dict(size=10)
-            ),
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            showlegend=True,
-            yaxis=dict(
-                tickmode='array',
-                tickvals=[0, 1],
-                ticktext=['🔴 Death Cross', '🟢 Golden Cross'],
-                range=[-0.5, 1.5]
-            )
-        )
-        
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f0f0f0', tickangle=45)
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f0f0f0')
-        
-    return fig
+    # Add bars for Death Crosses (negative values)
+    fig.add_trace(go.Bar(
+        x=summary_df['Ticker'],
+        y=-summary_df['Death Crosses'],
+        name='🔴 Death Crosses (SELL)',
+        marker_color='#E74C3C',
+        text=summary_df['Death Crosses'],
+        textposition='outside',
+        hovertemplate="<b>%{x}</b><br>Death Crosses: %{y}<extra></extra>"
+    ))
+    
+    # Add zero line
+    fig.add_hline(y=0, line_dash="solid", line_color="gray", opacity=0.5)
+    
+    # Update layout
+    fig.update_layout(
+        title="📊 Golden vs Death Cross Summary by Security",
+        xaxis_title="Security",
+        yaxis_title="Number of Crosses",
+        height=400,
+        barmode='relative',
+        hovermode='x unified',
+        font=dict(size=12),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    )
+    
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f0f0f0')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f0f0f0')
+    
+    return fig, summary_df
 
 def get_macd_analysis_summary(df):
     """Get MACD analysis summary"""
@@ -1327,6 +1409,7 @@ def display_portfolio_wide_analysis(portfolio_details):
             results = []
             all_macd_data = []
             all_cross_data = []
+            price_data = {}
             progress_bar = st.progress(0)
             
             end_date = datetime.now()
@@ -1342,6 +1425,8 @@ def display_portfolio_wide_analysis(portfolio_details):
                 
                 if data is not None and not data.empty:
                     df = calculate_technical_indicators(data)
+                    price_data[ticker] = df
+                    
                     macd_summary = get_macd_analysis_summary(df)
                     cross_summary = get_cross_analysis_summary(df)
                     combined = get_combined_signal(macd_summary, cross_summary)
@@ -1409,6 +1494,38 @@ def display_portfolio_wide_analysis(portfolio_details):
                 
                 st.write("---")
                 
+                # ===== ENHANCED GOLDEN/DEATH CROSS GRAPH =====
+                if all_cross_data:
+                    st.markdown("### 🟡 Golden vs 🔴 Death Cross Time-Series")
+                    st.write("Timeline of all crossover events across your portfolio holdings - each security shown separately")
+                    
+                    st.markdown('<div class="graph-container">', unsafe_allow_html=True)
+                    fig_cross_portfolio = plot_portfolio_cross_comparison_enhanced(
+                        all_cross_data, portfolio_details, price_data
+                    )
+                    st.plotly_chart(fig_cross_portfolio, use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Cross Summary Chart
+                    st.markdown("### 📊 Golden vs Death Cross Summary")
+                    fig_cross_summary, summary_df = plot_portfolio_cross_summary(all_cross_data, portfolio_details)
+                    st.plotly_chart(fig_cross_summary, use_container_width=True)
+                    
+                    # Display summary table
+                    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                    
+                    # ===== Aggregated Cross Table =====
+                    with st.expander("📋 View Detailed Crossover History for All Securities", expanded=False):
+                        # Combine all cross data
+                        combined_cross = pd.concat(all_cross_data, ignore_index=True)
+                        
+                        if not combined_cross.empty:
+                            cross_display = combined_cross[['Ticker', 'Date', 'Type', 'Short MA', 'Long MA', 'Price at Signal', 'Signal Strength']].copy()
+                            cross_display = cross_display.sort_values(['Ticker', 'Date'], ascending=[True, False])
+                            st.dataframe(cross_display, use_container_width=True, hide_index=True)
+                    
+                    st.write("---")
+                
                 # ===== PORTFOLIO MACD COMPARISON GRAPH =====
                 if all_macd_data:
                     st.markdown("### 📈 Portfolio MACD Comparison")
@@ -1447,28 +1564,6 @@ def display_portfolio_wide_analysis(portfolio_details):
                         macd_display['Signal'] = macd_display['Signal'].apply(add_macd_indicator)
                         
                         st.dataframe(macd_display, use_container_width=True, hide_index=True)
-                    
-                    st.write("---")
-                
-                # ===== PORTFOLIO CROSS COMPARISON GRAPH (LINE GRAPH) =====
-                if all_cross_data:
-                    st.markdown("### 🟡 Golden vs 🔴 Death Cross Time-Series")
-                    st.write("Timeline of all crossover events across your portfolio holdings")
-                    
-                    st.markdown('<div class="graph-container">', unsafe_allow_html=True)
-                    fig_cross_portfolio = plot_portfolio_cross_comparison(all_cross_data, portfolio_details)
-                    st.plotly_chart(fig_cross_portfolio, use_container_width=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # ===== Aggregated Cross Table =====
-                    with st.expander("📋 View Crossover History for All Securities", expanded=False):
-                        # Combine all cross data
-                        combined_cross = pd.concat(all_cross_data, ignore_index=True)
-                        
-                        if not combined_cross.empty:
-                            cross_display = combined_cross[['Ticker', 'Date', 'Type', 'Short MA', 'Long MA', 'Price at Signal', 'Signal Strength']].copy()
-                            cross_display = cross_display.sort_values(['Ticker', 'Date'], ascending=[True, False])
-                            st.dataframe(cross_display, use_container_width=True, hide_index=True)
                     
                     st.write("---")
                 

@@ -815,10 +815,11 @@ def plot_portfolio_cross_comparison_enhanced(all_cross_data, portfolio_details, 
                         row=row, col=col
                     )
                 
-                # Add current trend annotation
+                # Add current trend annotation using paper coordinates within subplot
                 current_trend = "🟢 Bullish" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "🔴 Bearish"
                 allocation = holding['Allocation %']
                 
+                # Use xref and yref with paper coordinates for each subplot
                 fig.add_annotation(
                     x=0.02,
                     y=0.95,
@@ -837,7 +838,7 @@ def plot_portfolio_cross_comparison_enhanced(all_cross_data, portfolio_details, 
     # Update layout
     fig.update_layout(
         title="🟡 Golden vs 🔴 Death Cross Analysis - All Portfolio Holdings",
-        height=300 * n_rows + 150,
+        height=max(400, 300 * n_rows + 150),
         showlegend=False,
         hovermode='x unified',
         font=dict(size=11),

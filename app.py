@@ -1,6 +1,6 @@
 """
 AI Robo-Advisor for FinTech Thesis
-With Professional Dashboard & Banking Analytics & Technical Analysis
+With Professional Dashboard, Banking Analytics & Integrated Technical Analysis
 Author: Syed Kamran Abbas 
 """
 
@@ -50,6 +50,27 @@ st.markdown("""
         text-align: center;
         display: inline-block;
     }
+    .buy-signal {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 10px;
+        border-radius: 5px;
+        border-left: 4px solid #28a745;
+    }
+    .sell-signal {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        border-radius: 5px;
+        border-left: 4px solid #dc3545;
+    }
+    .neutral-signal {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 10px;
+        border-radius: 5px;
+        border-left: 4px solid #ffc107;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,7 +83,8 @@ ETF_DATABASE = {
         "expense_ratio": 0.03,
         "risk_level": "Low",
         "dividend_yield": 3.2,
-        "inception_date": "2007-04-03"
+        "inception_date": "2007-04-03",
+        "sector": "Fixed Income"
     },
     "VTI": {
         "name": "Vanguard Total Stock Market ETF",
@@ -71,7 +93,8 @@ ETF_DATABASE = {
         "expense_ratio": 0.03,
         "risk_level": "Medium-High",
         "dividend_yield": 1.4,
-        "inception_date": "2001-05-24"
+        "inception_date": "2001-05-24",
+        "sector": "Equity"
     },
     "VXUS": {
         "name": "Vanguard Total International Stock ETF",
@@ -80,7 +103,8 @@ ETF_DATABASE = {
         "expense_ratio": 0.07,
         "risk_level": "Medium-High",
         "dividend_yield": 2.9,
-        "inception_date": "2011-01-26"
+        "inception_date": "2011-01-26",
+        "sector": "Equity"
     },
     "QQQ": {
         "name": "Invesco QQQ Trust",
@@ -89,7 +113,8 @@ ETF_DATABASE = {
         "expense_ratio": 0.20,
         "risk_level": "High",
         "dividend_yield": 0.6,
-        "inception_date": "1999-03-10"
+        "inception_date": "1999-03-10",
+        "sector": "Technology Growth"
     },
     "SHY": {
         "name": "iShares 1-3 Year Treasury Bond ETF",
@@ -98,7 +123,38 @@ ETF_DATABASE = {
         "expense_ratio": 0.15,
         "risk_level": "Very Low",
         "dividend_yield": 4.1,
-        "inception_date": "2002-07-22"
+        "inception_date": "2002-07-22",
+        "sector": "Fixed Income"
+    },
+    "SPY": {
+        "name": "SPDR S&P 500 ETF Trust",
+        "category": "US Large Cap",
+        "description": "Tracks S&P 500 Index - 500 largest US companies",
+        "expense_ratio": 0.09,
+        "risk_level": "Medium",
+        "dividend_yield": 1.3,
+        "inception_date": "1993-01-22",
+        "sector": "Equity"
+    },
+    "TLT": {
+        "name": "iShares 20+ Year Treasury Bond ETF",
+        "category": "Long-term Bonds",
+        "description": "Long-term US government bonds",
+        "expense_ratio": 0.15,
+        "risk_level": "Medium",
+        "dividend_yield": 3.8,
+        "inception_date": "2002-07-22",
+        "sector": "Fixed Income"
+    },
+    "GLD": {
+        "name": "SPDR Gold Shares",
+        "category": "Commodities",
+        "description": "Physical gold bullion",
+        "expense_ratio": 0.40,
+        "risk_level": "Medium",
+        "dividend_yield": 0.0,
+        "inception_date": "2004-11-18",
+        "sector": "Commodity"
     }
 }
 
@@ -142,23 +198,25 @@ def get_portfolio_allocation(risk_profile, total_amount):
     portfolios = {
         "Conservative": {
             "allocation": {
-                "BND": 0.50,
-                "SHY": 0.20,
+                "BND": 0.40,
+                "SHY": 0.25,
                 "VTI": 0.20,
-                "VXUS": 0.10
+                "VXUS": 0.10,
+                "GLD": 0.05
             },
             "expected_return": 0.05,
-            "expected_volatility": 0.08,
-            "sharpe_ratio": 0.62,
-            "max_drawdown": -0.12,
+            "expected_volatility": 0.07,
+            "sharpe_ratio": 0.71,
+            "max_drawdown": -0.10,
             "suitable_for": "Retirement funds, emergency savings, short-term goals (1-3 years)"
         },
         "Moderate": {
             "allocation": {
-                "BND": 0.25,
-                "VTI": 0.45,
+                "BND": 0.20,
+                "VTI": 0.40,
                 "VXUS": 0.20,
-                "QQQ": 0.10
+                "QQQ": 0.10,
+                "SPY": 0.10
             },
             "expected_return": 0.08,
             "expected_volatility": 0.12,
@@ -168,10 +226,11 @@ def get_portfolio_allocation(risk_profile, total_amount):
         },
         "Aggressive": {
             "allocation": {
-                "VTI": 0.45,
+                "VTI": 0.35,
                 "QQQ": 0.25,
                 "VXUS": 0.20,
-                "BND": 0.10
+                "SPY": 0.15,
+                "BND": 0.05
             },
             "expected_return": 0.11,
             "expected_volatility": 0.18,
@@ -190,11 +249,13 @@ def get_portfolio_allocation(risk_profile, total_amount):
             "Ticker": ticker,
             "ETF Name": etf_info.get("name", ticker),
             "Category": etf_info.get("category", "Other"),
+            "Sector": etf_info.get("sector", "Other"),
             "Allocation %": weight * 100,
             "Amount ($)": total_amount * weight,
             "Description": etf_info.get("description", "Diversified ETF"),
             "Expense Ratio": etf_info.get("expense_ratio", 0.10),
-            "Dividend Yield": etf_info.get("dividend_yield", 0)
+            "Dividend Yield": etf_info.get("dividend_yield", 0),
+            "Risk Level": etf_info.get("risk_level", "Medium")
         })
     
     return portfolio_details, allocation_data
@@ -232,7 +293,7 @@ def run_monte_carlo(initial_amount, years, expected_return, volatility, n_sims=5
     return portfolio_values, stats
 
 # ========== TECHNICAL ANALYSIS FUNCTIONS ==========
-@st.cache_data
+@st.cache_data(ttl=3600)
 def fetch_stock_data(ticker, start_date, end_date):
     """Fetch stock data from Yahoo Finance"""
     try:
@@ -241,10 +302,11 @@ def fetch_stock_data(ticker, start_date, end_date):
         if data.empty:
             return None
         return data
-    except:
+    except Exception as e:
+        st.error(f"Error fetching {ticker}: {str(e)}")
         return None
 
-def calculate_technical_indicators(data, ma_short, ma_long, macd_fast, macd_slow, macd_signal):
+def calculate_technical_indicators(data, ma_short=20, ma_long=50, macd_fast=12, macd_slow=26, macd_signal=9):
     """Calculate MACD and Golden Cross indicators"""
     df = data.copy()
     
@@ -263,115 +325,533 @@ def calculate_technical_indicators(data, ma_short, ma_long, macd_fast, macd_slow
     df['Golden_Cross'] = (df['MA_Short'] > df['MA_Long']) & (df['MA_Short'].shift(1) <= df['MA_Long'].shift(1))
     df['Death_Cross'] = (df['MA_Short'] < df['MA_Long']) & (df['MA_Short'].shift(1) >= df['MA_Long'].shift(1))
     
+    # Current trend status
+    df['Trend'] = 'Bullish' if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else 'Bearish'
+    
     return df
 
-def plot_technical_analysis(df, ticker, ma_short, ma_long, macd_fast, macd_slow, macd_signal):
-    """Create technical analysis plots"""
+def plot_macd_analysis(df, ticker, macd_fast, macd_slow, macd_signal):
+    """Plot MACD analysis separately"""
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                        vertical_spacing=0.08, 
+                        row_heights=[0.5, 0.5],
+                        subplot_titles=(f"{ticker} - Price Chart", "MACD Indicator"))
     
-    # Find crossover points
-    golden_crosses = df[df['Golden_Cross'] == True]
-    death_crosses = df[df['Death_Cross'] == True]
+    # Price chart with moving averages
+    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], 
+                            mode='lines', name='Close Price', 
+                            line=dict(color='black', width=1.5)), row=1, col=1)
     
-    # Create subplot: Price (top) and MACD (bottom)
-    fig = make_subplots(rows=3, cols=1, 
-                        shared_xaxes=True, 
-                        vertical_spacing=0.05,
-                        row_heights=[0.5, 0.25, 0.25],
-                        subplot_titles=(f"{ticker} - Price with Moving Averages", 
-                                       "MACD Indicator", 
-                                       "MACD Histogram"))
-    
-    # Row 1: Candlestick chart with Moving Averages
-    fig.add_trace(go.Candlestick(x=df.index,
-                                 open=df['Open'],
-                                 high=df['High'],
-                                 low=df['Low'],
-                                 close=df['Close'],
-                                 name='Price',
-                                 showlegend=True), row=1, col=1)
-    
-    fig.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], 
-                            mode='lines', name=f'MA {ma_short}', 
-                            line=dict(color='orange', width=1.5)), row=1, col=1)
-    
-    fig.add_trace(go.Scatter(x=df.index, y=df['MA_Long'], 
-                            mode='lines', name=f'MA {ma_long}', 
-                            line=dict(color='blue', width=1.5)), row=1, col=1)
-    
-    # Mark Golden and Death Crosses
-    fig.add_trace(go.Scatter(x=golden_crosses.index, y=golden_crosses['Close'],
-                            mode='markers', name='Golden Cross',
-                            marker=dict(color='green', size=10, symbol='triangle-up')), row=1, col=1)
-    
-    fig.add_trace(go.Scatter(x=death_crosses.index, y=death_crosses['Close'],
-                            mode='markers', name='Death Cross',
-                            marker=dict(color='red', size=10, symbol='triangle-down')), row=1, col=1)
-    
-    # Row 2: MACD and Signal Line
+    # MACD and Signal Line
     fig.add_trace(go.Scatter(x=df.index, y=df['MACD'], 
-                            mode='lines', name='MACD', 
+                            mode='lines', name='MACD Line', 
                             line=dict(color='blue', width=2)), row=2, col=1)
     
     fig.add_trace(go.Scatter(x=df.index, y=df['Signal_Line'], 
                             mode='lines', name='Signal Line', 
                             line=dict(color='red', width=2)), row=2, col=1)
     
-    # Row 3: MACD Histogram
+    # MACD Histogram
     colors = ['green' if val >= 0 else 'red' for val in df['MACD_Histogram']]
     fig.add_trace(go.Bar(x=df.index, y=df['MACD_Histogram'], 
-                        name='Histogram', marker_color=colors), row=3, col=1)
+                        name='MACD Histogram', marker_color=colors), row=2, col=1)
     
     # Add zero line
     fig.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", row=3, col=1)
     
-    # Update layout
-    fig.update_layout(title=f"{ticker} - Technical Analysis (MACD & Golden Cross)",
-                     height=800,
+    fig.update_layout(title=f"{ticker} - MACD Analysis",
+                     height=600,
                      showlegend=True,
-                     xaxis_title="Date",
-                     xaxis_rangeslider_visible=False)
+                     xaxis_title="Date")
     
     fig.update_yaxes(title_text="Price ($)", row=1, col=1)
-    fig.update_yaxes(title_text="MACD", row=2, col=1)
-    fig.update_yaxes(title_text="Histogram", row=3, col=1)
+    fig.update_yaxes(title_text="MACD Value", row=2, col=1)
     
     return fig
 
-def get_technical_signals(df):
+def plot_golden_death_cross(df, ticker, ma_short, ma_long):
+    """Plot Golden Cross vs Death Cross separately"""
+    fig = go.Figure()
+    
+    # Price line
+    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], 
+                            mode='lines', name='Close Price', 
+                            line=dict(color='gray', width=1)))
+    
+    # Short MA
+    fig.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], 
+                            mode='lines', name=f'MA {ma_short} (Short)', 
+                            line=dict(color='orange', width=2)))
+    
+    # Long MA
+    fig.add_trace(go.Scatter(x=df.index, y=df['MA_Long'], 
+                            mode='lines', name=f'MA {ma_long} (Long)', 
+                            line=dict(color='blue', width=2)))
+    
+    # Golden Cross markers
+    golden_crosses = df[df['Golden_Cross'] == True]
+    death_crosses = df[df['Death_Cross'] == True]
+    
+    fig.add_trace(go.Scatter(x=golden_crosses.index, y=golden_crosses['Close'],
+                            mode='markers', name='Golden Cross (Buy Signal)',
+                            marker=dict(color='green', size=12, symbol='triangle-up', 
+                                       line=dict(color='darkgreen', width=2))))
+    
+    fig.add_trace(go.Scatter(x=death_crosses.index, y=death_crosses['Close'],
+                            mode='markers', name='Death Cross (Sell Signal)',
+                            marker=dict(color='red', size=12, symbol='triangle-down',
+                                       line=dict(color='darkred', width=2))))
+    
+    # Highlight the crossover regions
+    if len(golden_crosses) > 0:
+        last_golden = golden_crosses.index[-1]
+        fig.add_vline(x=last_golden, line_dash="dash", line_color="green",
+                     annotation_text="Last Golden Cross", annotation_position="top left")
+    
+    if len(death_crosses) > 0:
+        last_death = death_crosses.index[-1]
+        fig.add_vline(x=last_death, line_dash="dash", line_color="red",
+                     annotation_text="Last Death Cross", annotation_position="top right")
+    
+    fig.update_layout(title=f"{ticker} - Golden Cross vs Death Cross Analysis",
+                     xaxis_title="Date",
+                     yaxis_title="Price ($)",
+                     height=500,
+                     hovermode='x unified')
+    
+    return fig
+
+def get_technical_signals(df, ticker, etf_info):
     """Generate trading signals based on technical indicators"""
-    signals = []
+    signals = {
+        "buy_signals": [],
+        "sell_signals": [],
+        "neutral_signals": [],
+        "overall": "",
+        "confidence": 0,
+        "summary": ""
+    }
     
-    # Golden Cross signal
+    # Golden Cross/Death Cross signals
     if df['Golden_Cross'].iloc[-1]:
-        signals.append(("🟢 Golden Cross (MA Crossover)", "BUY", 
-                       f"Short MA ({df['MA_Short'].iloc[-1]:.2f}) crossed above Long MA ({df['MA_Long'].iloc[-1]:.2f})"))
+        signals["buy_signals"].append({
+            "indicator": "Golden Cross (Moving Average Crossover)",
+            "signal": "BUY",
+            "details": f"Short MA ({df['MA_Short'].iloc[-1]:.2f}) crossed above Long MA ({df['MA_Long'].iloc[-1]:.2f})",
+            "strength": "Strong"
+        })
     elif df['Death_Cross'].iloc[-1]:
-        signals.append(("🔴 Death Cross (MA Crossover)", "SELL", 
-                       f"Short MA ({df['MA_Short'].iloc[-1]:.2f}) crossed below Long MA ({df['MA_Long'].iloc[-1]:.2f})"))
+        signals["sell_signals"].append({
+            "indicator": "Death Cross (Moving Average Crossover)",
+            "signal": "SELL",
+            "details": f"Short MA ({df['MA_Short'].iloc[-1]:.2f}) crossed below Long MA ({df['MA_Long'].iloc[-1]:.2f})",
+            "strength": "Strong"
+        })
     
-    # MACD signal
+    # MACD signals
     if df['MACD'].iloc[-1] > df['Signal_Line'].iloc[-1] and df['MACD'].iloc[-2] <= df['Signal_Line'].iloc[-2]:
-        signals.append(("🟢 MACD Bullish Crossover", "BUY", "MACD line crossed above Signal line"))
+        signals["buy_signals"].append({
+            "indicator": "MACD Bullish Crossover",
+            "signal": "BUY",
+            "details": "MACD line crossed above Signal line indicating upward momentum",
+            "strength": "Moderate"
+        })
     elif df['MACD'].iloc[-1] < df['Signal_Line'].iloc[-1] and df['MACD'].iloc[-2] >= df['Signal_Line'].iloc[-2]:
-        signals.append(("🔴 MACD Bearish Crossover", "SELL", "MACD line crossed below Signal line"))
+        signals["sell_signals"].append({
+            "indicator": "MACD Bearish Crossover",
+            "signal": "SELL",
+            "details": "MACD line crossed below Signal line indicating downward momentum",
+            "strength": "Moderate"
+        })
     
-    # Current trend based on moving averages
-    current_short_ma = df['MA_Short'].iloc[-1]
-    current_long_ma = df['MA_Long'].iloc[-1]
-    
-    if current_short_ma > current_long_ma:
-        signals.append(("📈 Uptrend", "BULLISH", f"Short MA above Long MA by ${current_short_ma - current_long_ma:.2f}"))
-    else:
-        signals.append(("📉 Downtrend", "BEARISH", f"Short MA below Long MA by ${current_long_ma - current_short_ma:.2f}"))
-    
-    # MACD momentum
+    # MACD Histogram momentum
     if df['MACD_Histogram'].iloc[-1] > 0 and df['MACD_Histogram'].iloc[-1] > df['MACD_Histogram'].iloc[-2]:
-        signals.append(("📊 Increasing Bullish Momentum", "BULLISH", "Histogram positive and increasing"))
+        if df['MACD_Histogram'].iloc[-2] <= 0:
+            signals["buy_signals"].append({
+                "indicator": "MACD Histogram Turning Positive",
+                "signal": "BUY",
+                "details": "Histogram crossed above zero line indicating bullish momentum",
+                "strength": "Moderate"
+            })
+        else:
+            signals["buy_signals"].append({
+                "indicator": "Increasing Bullish Momentum",
+                "signal": "BULLISH",
+                "details": "Histogram positive and increasing",
+                "strength": "Weak"
+            })
     elif df['MACD_Histogram'].iloc[-1] < 0 and df['MACD_Histogram'].iloc[-1] < df['MACD_Histogram'].iloc[-2]:
-        signals.append(("📊 Increasing Bearish Momentum", "BEARISH", "Histogram negative and decreasing"))
+        if df['MACD_Histogram'].iloc[-2] >= 0:
+            signals["sell_signals"].append({
+                "indicator": "MACD Histogram Turning Negative",
+                "signal": "SELL",
+                "details": "Histogram crossed below zero line indicating bearish momentum",
+                "strength": "Moderate"
+            })
+        else:
+            signals["sell_signals"].append({
+                "indicator": "Increasing Bearish Momentum",
+                "signal": "BEARISH",
+                "details": "Histogram negative and decreasing",
+                "strength": "Weak"
+            })
+    
+    # Current trend
+    if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1]:
+        signals["buy_signals"].append({
+            "indicator": "Uptrend Confirmed",
+            "signal": "BULLISH",
+            "details": f"Short MA above Long MA by ${abs(df['MA_Short'].iloc[-1] - df['MA_Long'].iloc[-1]):.2f}",
+            "strength": "Moderate"
+        })
+    else:
+        signals["sell_signals"].append({
+            "indicator": "Downtrend Confirmed",
+            "signal": "BEARISH",
+            "details": f"Short MA below Long MA by ${abs(df['MA_Short'].iloc[-1] - df['MA_Long'].iloc[-1]):.2f}",
+            "strength": "Moderate"
+        })
+    
+    # Calculate overall recommendation
+    buy_count = len(signals["buy_signals"])
+    sell_count = len(signals["sell_signals"])
+    
+    if buy_count > sell_count:
+        signals["overall"] = "BUY"
+        signals["confidence"] = (buy_count / (buy_count + sell_count)) * 100
+        signals["summary"] = f"Based on {buy_count} bullish signals vs {sell_count} bearish signals, {ticker} shows positive technical momentum."
+    elif sell_count > buy_count:
+        signals["overall"] = "SELL"
+        signals["confidence"] = (sell_count / (buy_count + sell_count)) * 100
+        signals["summary"] = f"Based on {sell_count} bearish signals vs {buy_count} bullish signals, {ticker} shows negative technical momentum."
+    else:
+        signals["overall"] = "NEUTRAL"
+        signals["confidence"] = 50
+        signals["summary"] = f"Mixed signals detected for {ticker}. Consider waiting for clearer trend confirmation."
     
     return signals
+
+def analyze_portfolio_securities(portfolio_details, risk_profile, investment_horizon):
+    """Analyze all securities in the portfolio and provide recommendations"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
+    
+    analysis_results = []
+    
+    with st.spinner("Analyzing portfolio securities..."):
+        for security in portfolio_details:
+            ticker = security['Ticker']
+            st.write(f"📊 Analyzing {ticker} - {security['ETF Name']}...")
+            
+            # Fetch data
+            data = fetch_stock_data(ticker, start_date, end_date)
+            
+            if data is not None and not data.empty:
+                # Calculate indicators
+                df_tech = calculate_technical_indicators(data)
+                
+                # Get signals
+                signals = get_technical_signals(df_tech, ticker, security)
+                
+                # Store results
+                analysis_results.append({
+                    "Ticker": ticker,
+                    "ETF Name": security['ETF Name'],
+                    "Category": security['Category'],
+                    "Allocation": security['Allocation %'],
+                    "Current Price": df_tech['Close'].iloc[-1],
+                    "MA_Short": df_tech['MA_Short'].iloc[-1],
+                    "MA_Long": df_tech['MA_Long'].iloc[-1],
+                    "Trend": df_tech['Trend'].iloc[-1],
+                    "MACD": df_tech['MACD'].iloc[-1],
+                    "Signal": df_tech['Signal_Line'].iloc[-1],
+                    "Histogram": df_tech['MACD_Histogram'].iloc[-1],
+                    "Overall_Signal": signals["overall"],
+                    "Confidence": signals["confidence"],
+                    "Summary": signals["summary"],
+                    "Buy_Signals": len(signals["buy_signals"]),
+                    "Sell_Signals": len(signals["sell_signals"]),
+                    "Raw_Signals": signals
+                })
+            else:
+                analysis_results.append({
+                    "Ticker": ticker,
+                    "ETF Name": security['ETF Name'],
+                    "Category": security['Category'],
+                    "Allocation": security['Allocation %'],
+                    "Current Price": 0,
+                    "MA_Short": 0,
+                    "MA_Long": 0,
+                    "Trend": "N/A",
+                    "MACD": 0,
+                    "Signal": 0,
+                    "Histogram": 0,
+                    "Overall_Signal": "N/A",
+                    "Confidence": 0,
+                    "Summary": f"Could not fetch data for {ticker}",
+                    "Buy_Signals": 0,
+                    "Sell_Signals": 0,
+                    "Raw_Signals": None
+                })
+    
+    return analysis_results
+
+# ========== TECHNICAL ANALYSIS TAB ==========
+def technical_analysis_tab(portfolio_details=None, risk_profile=None, investment_horizon=None):
+    """Display Technical Analysis tab content integrated with portfolio"""
+    st.header("📈 Technical Analysis - Portfolio Securities")
+    st.caption("Analyze MACD and Golden/Death Cross signals for your portfolio holdings")
+    st.write("---")
+    
+    if portfolio_details is None or len(portfolio_details) == 0:
+        st.warning("⚠️ Please generate a portfolio first in the 'Portfolio Advisor' tab before using Technical Analysis.")
+        st.info("Go to the Portfolio Advisor tab, complete the risk assessment, and generate your portfolio to see technical analysis here.")
+        return
+    
+    # Display portfolio context
+    with st.expander("📊 Current Portfolio Summary", expanded=True):
+        st.write(f"**Risk Profile:** {risk_profile}")
+        st.write(f"**Investment Horizon:** {investment_horizon} years")
+        
+        portfolio_df = pd.DataFrame(portfolio_details)
+        display_cols = ['Ticker', 'ETF Name', 'Category', 'Allocation %', 'Amount ($)']
+        st.dataframe(portfolio_df[display_cols], use_container_width=True, hide_index=True)
+    
+    st.write("---")
+    
+    # Analyze all securities
+    st.subheader("🔍 Technical Analysis Results")
+    st.write("Analyzing each security in your portfolio using MACD and Moving Average crossovers...")
+    
+    analysis_results = analyze_portfolio_securities(portfolio_details, risk_profile, investment_horizon)
+    
+    # Display summary table
+    st.subheader("📊 Technical Analysis Summary Table")
+    
+    summary_df = pd.DataFrame([{
+        'Ticker': r['Ticker'],
+        'ETF Name': r['ETF Name'][:30] + '...' if len(r['ETF Name']) > 30 else r['ETF Name'],
+        'Allocation %': f"{r['Allocation']:.0f}%",
+        'Current Price': f"${r['Current Price']:.2f}" if r['Current Price'] > 0 else 'N/A',
+        'Trend': r['Trend'],
+        'Signal': r['Overall_Signal'],
+        'Confidence': f"{r['Confidence']:.0f}%",
+        'Buy Signals': r['Buy_Signals'],
+        'Sell Signals': r['Sell_Signals']
+    } for r in analysis_results])
+    
+    # Color code the Signal column
+    def color_signal(val):
+        if val == 'BUY':
+            return 'background-color: #d4edda; color: #155724'
+        elif val == 'SELL':
+            return 'background-color: #f8d7da; color: #721c24'
+        else:
+            return 'background-color: #fff3cd; color: #856404'
+    
+    st.dataframe(summary_df.style.applymap(color_signal, subset=['Signal']), 
+                use_container_width=True, hide_index=True)
+    
+    st.write("---")
+    
+    # Detailed analysis for each security
+    st.subheader("📈 Detailed Security Analysis")
+    
+    for idx, result in enumerate(analysis_results):
+        if result['Current Price'] > 0:
+            with st.expander(f"🔍 {result['Ticker']} - {result['ETF Name']} ({result['Category']})", expanded=(idx==0)):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Current Price", f"${result['Current Price']:.2f}")
+                    st.metric("Short MA (20)", f"${result['MA_Short']:.2f}")
+                    st.metric("Trend", result['Trend'])
+                
+                with col2:
+                    st.metric("Long MA (50)", f"${result['MA_Long']:.2f}")
+                    ma_diff = result['MA_Short'] - result['MA_Long']
+                    st.metric("MA Difference", f"${ma_diff:.2f}", 
+                             delta="Bullish" if ma_diff > 0 else "Bearish")
+                    st.metric("MACD", f"{result['MACD']:.4f}")
+                
+                with col3:
+                    st.metric("Signal Line", f"{result['Signal']:.4f}")
+                    st.metric("Histogram", f"{result['Histogram']:.4f}")
+                    st.metric("Overall Signal", result['Overall_Signal'])
+                
+                st.write("---")
+                
+                # Fetch data for charts
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=365)
+                data = fetch_stock_data(result['Ticker'], start_date, end_date)
+                
+                if data is not None:
+                    df_tech = calculate_technical_indicators(data)
+                    
+                    # Display MACD Plot
+                    st.subheader(f"📊 MACD Analysis - {result['Ticker']}")
+                    macd_fig = plot_macd_analysis(df_tech, result['Ticker'], 12, 26, 9)
+                    st.plotly_chart(macd_fig, use_container_width=True)
+                    
+                    # Display Golden/Death Cross Plot
+                    st.subheader(f"🟡 Golden Cross vs Death Cross - {result['Ticker']}")
+                    cross_fig = plot_golden_death_cross(df_tech, result['Ticker'], 20, 50)
+                    st.plotly_chart(cross_fig, use_container_width=True)
+                    
+                    # Display signals
+                    st.subheader("📋 Technical Signals")
+                    
+                    if result['Raw_Signals']:
+                        signals = result['Raw_Signals']
+                        
+                        col_a, col_b = st.columns(2)
+                        
+                        with col_a:
+                            if signals['buy_signals']:
+                                st.markdown("**🟢 Buy/Bullish Signals**")
+                                for signal in signals['buy_signals']:
+                                    st.markdown(f"""
+                                    <div class="buy-signal">
+                                        <strong>{signal['indicator']}</strong><br>
+                                        {signal['details']}<br>
+                                        <small>Strength: {signal['strength']}</small>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.write("")
+                        
+                        with col_b:
+                            if signals['sell_signals']:
+                                st.markdown("**🔴 Sell/Bearish Signals**")
+                                for signal in signals['sell_signals']:
+                                    st.markdown(f"""
+                                    <div class="sell-signal">
+                                        <strong>{signal['indicator']}</strong><br>
+                                        {signal['details']}<br>
+                                        <small>Strength: {signal['strength']}</small>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.write("")
+                        
+                        if not signals['buy_signals'] and not signals['sell_signals']:
+                            st.markdown("""
+                            <div class="neutral-signal">
+                                <strong>No Strong Signals Detected</strong><br>
+                                The security is showing neutral technical patterns.
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                st.write("---")
+    
+    # Portfolio-wide technical conclusion
+    st.write("---")
+    st.subheader("🎯 Portfolio-Wide Technical Conclusion")
+    
+    # Aggregate signals
+    buy_count = sum(1 for r in analysis_results if r['Overall_Signal'] == 'BUY')
+    sell_count = sum(1 for r in analysis_results if r['Overall_Signal'] == 'SELL')
+    neutral_count = sum(1 for r in analysis_results if r['Overall_Signal'] == 'NEUTRAL')
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("BUY Signals", buy_count)
+    with col2:
+        st.metric("SELL Signals", sell_count)
+    with col3:
+        st.metric("NEUTRAL", neutral_count)
+    with col4:
+        total_weighted_score = sum(
+            (r['Allocation'] / 100) * (1 if r['Overall_Signal'] == 'BUY' else -1 if r['Overall_Signal'] == 'SELL' else 0)
+            for r in analysis_results
+        )
+        st.metric("Weighted Sentiment", f"{total_weighted_score:.2f}", 
+                 delta="Bullish" if total_weighted_score > 0 else "Bearish" if total_weighted_score < 0 else "Neutral")
+    
+    st.write("---")
+    
+    # Generate comprehensive conclusion
+    st.subheader("📝 Technical Analysis Conclusion")
+    
+    if buy_count > sell_count:
+        st.success(f"""
+        ### ✅ Overall Technical Outlook: BULLISH
+        
+        **Summary:**
+        - {buy_count} securities showing BUY signals
+        - {sell_count} securities showing SELL signals  
+        - {neutral_count} securities showing NEUTRAL signals
+        
+        **Recommendation:**
+        Given your {risk_profile} risk profile and {investment_horizon}-year investment horizon, the current technical setup suggests favorable entry points for most portfolio holdings. Consider:
+        - ✅ Maintaining or increasing exposure to securities with BUY signals
+        - ⚠️ Monitoring securities with SELL signals for potential weakness
+        - 📊 Rebalancing quarterly to capture technical momentum
+        
+        **Risk Consideration:** While technicals are bullish, maintain your strategic allocation based on your risk profile.
+        """)
+    elif sell_count > buy_count:
+        st.error(f"""
+        ### ❌ Overall Technical Outlook: BEARISH
+        
+        **Summary:**
+        - {sell_count} securities showing SELL signals        - {buy_count} securities showing BUY signals
+        - {neutral_count} securities showing NEUTRAL signals
+        
+        **Recommendation:**
+        The technical indicators suggest caution for your {risk_profile} portfolio. Consider:
+        - 🔄 Reducing exposure to securities with strong SELL signals
+        - 💰 Increasing cash/bond allocation temporarily
+        - 📉 Implementing stop-losses at support levels
+        - ⏰ Waiting for trend reversal before increasing equity exposure
+        
+        **For your {investment_horizon}-year horizon:** Consider dollar-cost averaging new investments to reduce timing risk.
+        """)
+    else:
+        st.warning(f"""
+        ### ⚖️ Overall Technical Outlook: NEUTRAL/MIXED
+        
+        **Summary:**
+        - {neutral_count} securities showing NEUTRAL signals
+        - {buy_count} securities showing BUY signals
+        - {sell_count} securities showing SELL signals
+        
+        **Recommendation:**
+        Technical signals are mixed for your {risk_profile} portfolio. Best approach:
+        - ✅ Maintain current strategic allocation
+        - 📊 Focus on fundamental analysis for individual securities
+        - 🔍 Watch for clearer technical confirmation in coming weeks
+        - 💡 Consider increasing quality/defensive positions
+        
+        **For your {investment_horizon}-year horizon:** Stay disciplined with your investment plan and rebalance according to your target allocation.
+        """)
+    
+    st.write("---")
+    
+    # Actionable recommendations
+    st.subheader("🎯 Actionable Recommendations")
+    
+    col_rec1, col_rec2 = st.columns(2)
+    
+    with col_rec1:
+        st.markdown("**✅ Consider Increasing (BUY signals):**")
+        buy_securities = [r for r in analysis_results if r['Overall_Signal'] == 'BUY']
+        if buy_securities:
+            for sec in buy_securities:
+                st.write(f"- **{sec['Ticker']}** ({sec['ETF Name']}) - Confidence: {sec['Confidence']:.0f}%")
+        else:
+            st.write("- No strong BUY signals at this time")
+    
+    with col_rec2:
+        st.markdown("**⚠️ Consider Reducing/Reviewing (SELL signals):**")
+        sell_securities = [r for r in analysis_results if r['Overall_Signal'] == 'SELL']
+        if sell_securities:
+            for sec in sell_securities:
+                st.write(f"- **{sec['Ticker']}** ({sec['ETF Name']}) - Confidence: {sec['Confidence']:.0f}%")
+        else:
+            st.write("- No strong SELL signals at this time")
+    
+    st.write("---")
+    st.info("💡 **Technical Analysis Note:** Technical indicators are most effective when used alongside fundamental analysis and your long-term investment strategy. For your risk profile, consider rebalancing quarterly rather than reacting to short-term signals.")
 
 # ========== DASHBOARD FUNCTIONS ==========
 def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amount, investment_years, risk_profile):
@@ -448,7 +928,6 @@ def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amou
         st.write(f"**Monthly Dividend Income:** ${total_dividends/12:,.0f}")
         st.write(f"**Dividend Yield (Portfolio):** {(total_dividends/initial_amount)*100:.1f}%")
         
-        # Fee analysis
         total_fees = sum([etf['Amount ($)'] * (etf['Expense Ratio']/100) for etf in portfolio_details])
         st.write(f"**Annual Fees:** ${total_fees:.0f}")
         st.write(f"**10-Year Fee Cost:** ${total_fees*10:.0f}")
@@ -520,9 +999,8 @@ def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amou
     # Row 5: Comparison with Benchmarks
     st.subheader("📈 Benchmark Comparison")
     
-    # Calculate benchmark returns
-    sAndP_return = 0.10  # S&P 500 historical return
-    bond_return = 0.04    # Bond market return
+    sAndP_return = 0.10
+    bond_return = 0.04
     
     portfolio_final = sim_stats['median']
     sp500_final = initial_amount * (1 + sAndP_return) ** investment_years
@@ -550,7 +1028,6 @@ def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amou
     # Row 6: Probability Distribution
     st.subheader("📊 Probability Distribution of Returns")
     
-    # Create histogram of final values
     final_values_sim = np.random.normal(sim_stats['mean'], sim_stats['std_dev'], 10000)
     
     fig = go.Figure()
@@ -576,201 +1053,32 @@ def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amou
     
     st.plotly_chart(fig, use_container_width=True)
 
-# ========== TECHNICAL ANALYSIS TAB FUNCTION ==========
-def technical_analysis_tab():
-    """Display Technical Analysis tab content"""
-    st.header("📈 Technical Analysis - MACD & Golden Cross")
-    st.caption("Analyze stock trends using Moving Average Convergence Divergence (MACD) and Moving Average Crossover strategies")
-    st.write("---")
-    
-    # Sidebar within technical analysis tab
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("🔧 Configuration")
-        
-        # Stock selection
-        ticker = st.text_input("Stock Ticker", value="AAPL", key="tech_ticker").upper()
-        
-        # Date range
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
-        
-        tech_start_date = st.date_input("Start Date", start_date, key="tech_start")
-        tech_end_date = st.date_input("End Date", end_date, key="tech_end")
-        
-        st.write("---")
-        st.subheader("⚙️ Technical Parameters")
-        
-        # Moving Average parameters
-        ma_short = st.number_input("Short MA Period", min_value=5, max_value=50, value=20, key="ma_short")
-        ma_long = st.number_input("Long MA Period", min_value=20, max_value=200, value=50, key="ma_long")
-        
-        st.write("---")
-        st.subheader("📊 MACD Parameters")
-        
-        macd_fast = st.number_input("MACD Fast Period", min_value=5, max_value=20, value=12, key="macd_fast")
-        macd_slow = st.number_input("MACD Slow Period", min_value=20, max_value=50, value=26, key="macd_slow")
-        macd_signal = st.number_input("MACD Signal Period", min_value=5, max_value=15, value=9, key="macd_signal")
-        
-        analyze_button = st.button("🔍 Analyze Stock", type="primary", use_container_width=True)
-    
-    with col2:
-        if analyze_button:
-            with st.spinner(f"Fetching data for {ticker}..."):
-                # Fetch stock data
-                stock_data = fetch_stock_data(ticker, tech_start_date, tech_end_date)
-                
-                if stock_data is not None and not stock_data.empty:
-                    # Calculate technical indicators
-                    df_tech = calculate_technical_indicators(stock_data, ma_short, ma_long, 
-                                                             macd_fast, macd_slow, macd_signal)
-                    
-                    # Display current price info
-                    current_price = df_tech['Close'].iloc[-1]
-                    price_change = df_tech['Close'].iloc[-1] - df_tech['Close'].iloc[-2]
-                    price_change_pct = (price_change / df_tech['Close'].iloc[-2]) * 100
-                    
-                    col_a, col_b, col_c, col_d = st.columns(4)
-                    with col_a:
-                        st.metric("Current Price", f"${current_price:.2f}", f"{price_change_pct:.2f}%")
-                    with col_b:
-                        st.metric(f"MA {ma_short}", f"${df_tech['MA_Short'].iloc[-1]:.2f}")
-                    with col_c:
-                        st.metric(f"MA {ma_long}", f"${df_tech['MA_Long'].iloc[-1]:.2f}")
-                    with col_d:
-                        st.metric("Volume", f"{df_tech['Volume'].iloc[-1]:,.0f}")
-                    
-                    st.write("---")
-                    
-                    # Plot technical analysis
-                    fig_tech = plot_technical_analysis(df_tech, ticker, ma_short, ma_long, 
-                                                       macd_fast, macd_slow, macd_signal)
-                    st.plotly_chart(fig_tech, use_container_width=True)
-                    
-                    st.write("---")
-                    
-                    # Technical Signals
-                    st.subheader("📊 Technical Trading Signals")
-                    
-                    signals = get_technical_signals(df_tech)
-                    
-                    # Create signal cards
-                    col_sig1, col_sig2, col_sig3 = st.columns(3)
-                    
-                    # Categorize signals
-                    buy_signals = [s for s in signals if s[1] == "BUY"]
-                    sell_signals = [s for s in signals if s[1] == "SELL"]
-                    trend_signals = [s for s in signals if s[1] in ["BULLISH", "BEARISH"]]
-                    
-                    with col_sig1:
-                        st.markdown("**🟢 Buy Signals**")
-                        if buy_signals:
-                            for signal in buy_signals:
-                                st.success(f"**{signal[0]}**\n{signal[2]}")
-                        else:
-                            st.info("No buy signals detected")
-                    
-                    with col_sig2:
-                        st.markdown("**🔴 Sell Signals**")
-                        if sell_signals:
-                            for signal in sell_signals:
-                                st.error(f"**{signal[0]}**\n{signal[2]}")
-                        else:
-                            st.info("No sell signals detected")
-                    
-                    with col_sig3:
-                        st.markdown("**📈 Market Trend**")
-                        for signal in trend_signals:
-                            if signal[1] == "BULLISH":
-                                st.success(f"**{signal[0]}**\n{signal[2]}")
-                            else:
-                                st.error(f"**{signal[0]}**\n{signal[2]}")
-                    
-                    st.write("---")
-                    
-                    # Summary recommendation
-                    st.subheader("🎯 Overall Technical Recommendation")
-                    
-                    bullish_count = len([s for s in signals if s[1] in ["BUY", "BULLISH"]])
-                    bearish_count = len([s for s in signals if s[1] in ["SELL", "BEARISH"]])
-                    
-                    if bullish_count > bearish_count:
-                        st.success(f"### ✅ BULLISH BIAS")
-                        st.write(f"Based on {bullish_count} bullish signals vs {bearish_count} bearish signals, the technical outlook is positive.")
-                    elif bearish_count > bullish_count:
-                        st.error(f"### ❌ BEARISH BIAS")
-                        st.write(f"Based on {bearish_count} bearish signals vs {bullish_count} bullish signals, the technical outlook is negative.")
-                    else:
-                        st.warning(f"### ⚖️ NEUTRAL")
-                        st.write(f"Mixed signals detected. Consider waiting for clearer trend confirmation.")
-                    
-                    st.write("---")
-                    
-                    # Additional metrics
-                    st.subheader("📈 Key Technical Levels")
-                    
-                    # Calculate support and resistance (using recent highs/lows)
-                    recent_high = df_tech['High'].tail(20).max()
-                    recent_low = df_tech['Low'].tail(20).min()
-                    
-                    col_level1, col_level2, col_level3 = st.columns(3)
-                    with col_level1:
-                        st.metric("Resistance Level", f"${recent_high:.2f}", 
-                                 delta=f"+{((recent_high - current_price)/current_price)*100:.1f}%")
-                    with col_level2:
-                        st.metric("Support Level", f"${recent_low:.2f}", 
-                                 delta=f"-{((current_price - recent_low)/current_price)*100:.1f}%")
-                    with col_level3:
-                        rsi_approx = 50  # Placeholder - you can add RSI calculation if desired
-                        st.metric("RSI (Approx)", f"{rsi_approx:.0f}", "Neutral")
-                    
-                else:
-                    st.error(f"❌ Could not fetch data for {ticker}. Please check the ticker symbol and try again.")
-                    st.info("💡 Tip: Try using valid tickers like AAPL, GOOGL, MSFT, TSLA, AMZN, NVDA")
-        else:
-            # Welcome message
-            st.info("### 👈 Configure technical parameters and click 'Analyze Stock' to begin")
-            st.write("""
-            **This Technical Analysis tool provides:**
-            
-            - 📊 **MACD Indicator** - Momentum and trend direction
-            - 🟢 **Golden Cross** - Bullish signal when short MA crosses above long MA
-            - 🔴 **Death Cross** - Bearish signal when short MA crosses below long MA
-            - 📈 **Trading Signals** - Automated buy/sell recommendations
-            - 🎯 **Technical Levels** - Support, resistance, and trend analysis
-            
-            **How to use:**
-            1. Enter a stock ticker (e.g., AAPL, TSLA, MSFT)
-            2. Select date range for analysis
-            3. Adjust technical parameters if needed
-            4. Click 'Analyze Stock' to see results
-            """)
-            
-            # Example preview
-            st.subheader("📊 Sample Analysis (Apple Inc.)")
-            st.image("https://via.placeholder.com/800x400/2E86AB/white?text=MACD+and+Golden+Cross+Chart+Preview", 
-                    use_container_width=True)
-
 # ========== MAIN APPLICATION ==========
 def main():
     # Header
     st.title("🤖 AI Robo-Advisor")
-    st.caption("Professional Portfolio Construction with Real-Time Analytics Dashboard & Technical Analysis")
+    st.caption("Professional Portfolio Construction with Real-Time Analytics Dashboard & Integrated Technical Analysis")
     st.write("---")
+    
+    # Initialize session state for portfolio data
+    if 'portfolio_generated' not in st.session_state:
+        st.session_state.portfolio_generated = False
+        st.session_state.portfolio_details = None
+        st.session_state.risk_profile = None
+        st.session_state.investment_years = None
+        st.session_state.initial_amount = None
     
     # Create tabs
     tab1, tab2, tab3 = st.tabs(["📊 Portfolio Advisor", "📈 Technical Analysis", "📚 Education & Resources"])
     
-    # Tab 1: Portfolio Advisor (Original functionality)
+    # Tab 1: Portfolio Advisor
     with tab1:
-        # Sidebar - Risk Assessment (moved inside tab for better UX)
+        # Sidebar - Risk Assessment
         with st.sidebar:
             st.header("📋 Step 1: Risk Assessment")
             st.write("Answer these 5 questions honestly:")
             st.write("---")
             
-            # Question 1
             q1 = st.slider(
                 "**1. Investment Time Horizon**",
                 min_value=1, max_value=30, value=10,
@@ -778,7 +1086,6 @@ def main():
             )
             q1_score = min(5, q1 // 6 + 1)
             
-            # Question 2
             q2 = st.select_slider(
                 "**2. Reaction to Market Drop (20%)**",
                 options=["Sell everything", "Get nervous", "Do nothing", "Buy more", "Aggressively buy more"],
@@ -789,7 +1096,6 @@ def main():
                         "Buy more": 4, "Aggressively buy more": 5}
             q2_score = q2_scores[q2]
             
-            # Question 3
             q3 = st.radio(
                 "**3. Primary Investment Goal**",
                 ["Capital preservation", "Income generation", "Balanced growth", 
@@ -801,7 +1107,6 @@ def main():
                         "Balanced growth": 3, "Long-term wealth": 4, "Maximum growth": 5}
             q3_score = q3_scores[q3]
             
-            # Question 4
             q4 = st.slider(
                 "**4. Risk Capacity (% of savings)**",
                 min_value=0, max_value=100, value=50,
@@ -809,7 +1114,6 @@ def main():
             )
             q4_score = min(5, q4 // 20 + 1)
             
-            # Question 5
             q5 = st.select_slider(
                 "**5. Expected Annual Return**",
                 options=["3-4% (Very safe)", "5-6% (Conservative)", "7-8% (Moderate)", 
@@ -823,7 +1127,6 @@ def main():
             
             st.write("---")
             
-            # Investment details
             st.header("💰 Step 2: Investment Details")
             initial_amount = st.number_input(
                 "Investment Amount ($)",
@@ -843,24 +1146,26 @@ def main():
             )
             
             st.write("---")
-            
-            # Dashboard toggle
-            show_dashboard = st.checkbox("📊 Show Detailed Dashboard", value=True, 
-                                         help="Display comprehensive analytics dashboard")
-            
+            show_dashboard = st.checkbox("📊 Show Detailed Dashboard", value=True)
             st.write("---")
-            
-            # Submit button
             submit = st.button("🎯 Generate Portfolio", type="primary", use_container_width=True)
         
         # Main content - Results
         if submit:
-            # Calculate risk profile
             answers = [q1_score, q2_score, q3_score, q4_score, q5_score]
             risk_result = calculate_risk_profile(answers)
             risk_profile = risk_result["profile"]
             
-            # Display risk profile banner
+            # Store in session state
+            st.session_state.portfolio_generated = True
+            st.session_state.risk_profile = risk_profile
+            st.session_state.investment_years = investment_years
+            st.session_state.initial_amount = initial_amount
+            
+            portfolio_details, allocation_data = get_portfolio_allocation(risk_profile, initial_amount)
+            st.session_state.portfolio_details = portfolio_details
+            st.session_state.allocation_data = allocation_data
+            
             st.success(f"""
             ### ✅ Your Risk Profile: **{risk_profile}**
             {risk_result['description']}
@@ -868,26 +1173,20 @@ def main():
             """)
             
             st.write("---")
-            
-            # Get portfolio allocation
-            portfolio_details, allocation_data = get_portfolio_allocation(risk_profile, initial_amount)
-            portfolio_df = pd.DataFrame(portfolio_details)
-            
-            # Display portfolio allocation
             st.header("📊 Your Personalized Portfolio")
             st.write(f"Based on your {risk_profile} profile, we recommend this ETF portfolio:")
             
+            portfolio_df = pd.DataFrame(portfolio_details)
             col1, col2 = st.columns([1.5, 1])
             
             with col1:
-                display_df = portfolio_df[["Ticker", "ETF Name", "Allocation %", "Amount ($)", "Expense Ratio", "Dividend Yield"]]
+                display_df = portfolio_df[["Ticker", "ETF Name", "Category", "Allocation %", "Amount ($)", "Expense Ratio", "Dividend Yield"]]
                 display_df["Allocation %"] = display_df["Allocation %"].apply(lambda x: f"{x:.0f}%")
                 display_df["Amount ($)"] = display_df["Amount ($)"].apply(lambda x: f"${x:,.0f}")
                 display_df["Expense Ratio"] = display_df["Expense Ratio"].apply(lambda x: f"{x:.2f}%")
                 display_df["Dividend Yield"] = display_df["Dividend Yield"].apply(lambda x: f"{x:.1f}%")
                 st.dataframe(display_df, use_container_width=True, hide_index=True)
                 
-                # Portfolio summary
                 st.write("---")
                 st.write("**📈 Portfolio Characteristics:**")
                 st.write(f"• Expected Annual Return: **{allocation_data['expected_return']*100:.0f}%**")
@@ -896,34 +1195,21 @@ def main():
                 st.write(f"• Suitable For: **{allocation_data['suitable_for']}**")
             
             with col2:
-                fig = px.pie(
-                    portfolio_df, 
-                    values="Allocation %",
-                    names=portfolio_df["Ticker"],
-                    title="Asset Allocation",
-                    color_discrete_sequence=px.colors.qualitative.Set2,
-                    hole=0.3
-                )
+                fig = px.pie(portfolio_df, values="Allocation %", names=portfolio_df["Ticker"],
+                            title="Asset Allocation", color_discrete_sequence=px.colors.qualitative.Set2, hole=0.3)
                 fig.update_traces(textposition='inside', textinfo='percent+label')
                 fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
             
             st.write("---")
-            
-            # Monte Carlo Simulation
             st.header("📈 Monte Carlo Simulation")
             st.write(f"Projecting ${initial_amount:,} over {investment_years} years with {allocation_data['expected_return']*100:.0f}% expected return")
             
             with st.spinner(f"Running 5,000 market simulations..."):
-                sim_results, sim_stats = run_monte_carlo(
-                    initial_amount, 
-                    investment_years, 
-                    allocation_data['expected_return'],
-                    allocation_data['expected_volatility'],
-                    n_sims=5000
-                )
+                sim_results, sim_stats = run_monte_carlo(initial_amount, investment_years, 
+                                                        allocation_data['expected_return'],
+                                                        allocation_data['expected_volatility'], n_sims=5000)
             
-            # Display basic simulation stats
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Median Outcome", f"${sim_stats['median']:,.0f}")
@@ -934,55 +1220,26 @@ def main():
             with col4:
                 st.metric("Gain >50% Probability", f"{sim_stats['probability_of_gain_50pct']:.1f}%")
             
-            # Simulation chart
             days = np.arange(len(sim_results))
             median_path = np.median(sim_results, axis=1)
             percentile_25 = np.percentile(sim_results, 25, axis=1)
             percentile_75 = np.percentile(sim_results, 75, axis=1)
             
             fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=np.concatenate([days, days[::-1]]),
-                y=np.concatenate([percentile_75, percentile_25[::-1]]),
-                fill='toself',
-                fillcolor='rgba(128, 128, 128, 0.2)',
-                line=dict(color='rgba(255,255,255,0)'),
-                name='25th-75th Percentile',
-                showlegend=True
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=days,
-                y=median_path,
-                mode='lines',
-                line=dict(color='red', width=2),
-                name='Median Path'
-            ))
-            
-            fig.add_hline(y=initial_amount, line_dash="dash", line_color="green", 
-                         annotation_text="Initial Investment")
-            
-            fig.update_layout(
-                title=f"Portfolio Value Over {investment_years} Years (5,000 Simulations)",
-                xaxis_title="Trading Days",
-                yaxis_title="Portfolio Value ($)",
-                hovermode='x unified',
-                height=500
-            )
-            
+            fig.add_trace(go.Scatter(x=np.concatenate([days, days[::-1]]), y=np.concatenate([percentile_75, percentile_25[::-1]]),
+                                    fill='toself', fillcolor='rgba(128, 128, 128, 0.2)',
+                                    line=dict(color='rgba(255,255,255,0)'), name='25th-75th Percentile'))
+            fig.add_trace(go.Scatter(x=days, y=median_path, mode='lines', line=dict(color='red', width=2), name='Median Path'))
+            fig.add_hline(y=initial_amount, line_dash="dash", line_color="green", annotation_text="Initial Investment")
+            fig.update_layout(title=f"Portfolio Value Over {investment_years} Years (5,000 Simulations)",
+                            xaxis_title="Trading Days", yaxis_title="Portfolio Value ($)", hovermode='x unified', height=500)
             st.plotly_chart(fig, use_container_width=True)
-            
             st.write("---")
             
-            # Show Dashboard if enabled
             if show_dashboard:
-                create_dashboard(portfolio_details, allocation_data, sim_stats, 
-                               initial_amount, investment_years, risk_profile)
+                create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amount, investment_years, risk_profile)
             
-            # Education Section within tab
             st.header("📚 Understanding Your Portfolio")
-            
             with st.expander("🔍 What are these ETFs? (Click to expand)"):
                 for etf in portfolio_details:
                     st.write(f"**{etf['Ticker']} - {etf['ETF Name']}**")
@@ -990,51 +1247,16 @@ def main():
                     st.write(f"Category: {etf['Category']} | Expense Ratio: {etf['Expense Ratio']:.2f}% | Dividend Yield: {etf['Dividend Yield']:.1f}%")
                     st.write("---")
             
-            with st.expander("⚠️ Important Disclosures & Ethics (Required for LO4)"):
+            with st.expander("⚠️ Important Disclosures & Ethics"):
                 st.write("""
                 **Regulatory & Ethical Considerations:**
-                
-                1. **Past Performance**: Historical returns do not guarantee future results
-                2. **Market Risk**: All investments carry risk of loss
-                3. **Inflation Risk**: Fixed income investments may lose purchasing power
-                4. **Concentration Risk**: Sector-focused ETFs (like QQQ) have higher volatility
-                5. **No Guarantees**: Monte Carlo simulations are probabilistic, not certainties
-                
-                **AI Limitations:**
-                - Does not consider your complete financial picture (debts, emergency fund, insurance)
-                - Cannot predict black swan events (2008 crisis, COVID-19, etc.)
-                - Tax implications not considered
-                - Not personalized financial advice
-                
-                **Next Steps:**
-                - Consult with a licensed financial advisor
-                - Consider dollar-cost averaging for large investments
-                - Regularly rebalance your portfolio (annually)
-                """)
-            
-            with st.expander("📊 How the AI Makes Decisions"):
-                st.write(f"""
-                **Risk Scoring Methodology:**
-                - Your total risk score: **{risk_result['score']}/25**
-                - Conservative: 0-12 points → Higher bond allocation
-                - Moderate: 13-20 points → Balanced stock/bond mix
-                - Aggressive: 21-25 points → Growth-focused stocks
-                
-                **Why this portfolio for you:**
-                - Time horizon: {investment_years} years
-                - Risk tolerance matches {risk_profile} historical allocation models
-                - Based on Modern Portfolio Theory (Markowitz, 1952)
-                - Optimized for your risk/return trade-off
-                
-                **Monte Carlo Methodology:**
-                - 5,000 random market scenarios
-                - Assumes lognormal return distribution
-                - Historical volatility: {allocation_data['expected_volatility']*100:.0f}%
-                - 252 trading days per year
+                1. Past performance does not guarantee future results
+                2. All investments carry risk of loss
+                3. Monte Carlo simulations are probabilistic, not certainties
+                4. Not personalized financial advice - consult a licensed advisor
                 """)
         
         else:
-            # Welcome screen
             st.info("### 👈 Complete the risk assessment in the left sidebar to get your personalized portfolio")
             st.write("""
             **This tool will:**
@@ -1042,153 +1264,158 @@ def main():
             - ✅ Build a diversified ETF portfolio using real funds
             - ✅ Run 5,000 Monte Carlo simulations to project outcomes
             - ✅ Show detailed dashboard with risk analytics
-            - ✅ Compare performance against market benchmarks
-            - ✅ Calculate dividend income and fee analysis
-            - ✅ Explain the AI's decision-making process
+            - ✅ Provide integrated technical analysis for all holdings
+            """)
+    
+    # Tab 2: Technical Analysis (Integrated with Portfolio)
+    with tab2:
+        if st.session_state.portfolio_generated:
+            technical_analysis_tab(
+                portfolio_details=st.session_state.portfolio_details,
+                risk_profile=st.session_state.risk_profile,
+                investment_horizon=st.session_state.investment_years
+            )
+        else:
+            st.warning("⚠️ Please generate a portfolio first in the 'Portfolio Advisor' tab.")
+            st.info("""
+            ### How to use Technical Analysis:
+            1. Go to the **Portfolio Advisor** tab
+            2. Complete the risk assessment questions
+            3. Click 'Generate Portfolio'
+            4. Return to this tab to see technical analysis for your portfolio holdings
+            
+            The Technical Analysis will automatically analyze all securities in your portfolio using:
+            - 📊 MACD (Moving Average Convergence Divergence)
+            - 🟡 Golden Cross (Short MA crossing above Long MA)
+            - 🔴 Death Cross (Short MA crossing below Long MA)
+            - 📈 Trend analysis and momentum indicators
             """)
             
-            # Feature preview
-            st.subheader("✨ Dashboard Features")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.write("**Risk Analytics**")
-                st.write("• Value at Risk (VaR)")
-                st.write("• Maximum Drawdown")
-                st.write("• Sharpe Ratio")
-                st.write("• Volatility Analysis")
-            
-            with col2:
-                st.write("**Return Scenarios**")
-                st.write("• Best/Worst Case")
-                st.write("• Confidence Intervals")
-                st.write("• Probability Distribution")
-                st.write("• CAGR Calculation")
-            
-            with col3:
-                st.write("**Income Analysis**")
-                st.write("• Dividend Projections")
-                st.write("• Fee Impact")
-                st.write("• Tax Considerations")
-                st.write("• Benchmark Comparison")
-    
-    # Tab 2: Technical Analysis (NEW)
-    with tab2:
-        technical_analysis_tab()
+            # Show example preview
+            with st.expander("📊 Preview: What Technical Analysis Looks Like", expanded=True):
+                st.write("""
+                **Once you generate a portfolio, you'll see:**
+                
+                1. **Summary Table** - Overview of all securities with their technical signals
+                2. **Detailed Analysis** - For each security:
+                   - MACD chart with signal line and histogram
+                   - Golden Cross vs Death Cross visualization
+                   - Buy/Sell signals with confidence levels
+                3. **Portfolio Conclusion** - Aggregated technical outlook
+                4. **Actionable Recommendations** - Which securities to consider increasing or reducing
+                
+                **Example Signal Interpretation:**
+                - 🟢 **Golden Cross** = Bullish - Short MA crosses above Long MA
+                - 🔴 **Death Cross** = Bearish - Short MA crosses below Long MA
+                - 📈 **MACD Bullish** = MACD line crosses above Signal line
+                - 📉 **MACD Bearish** = MACD line crosses below Signal line
+                """)
     
     # Tab 3: Education & Resources
     with tab3:
         st.header("📚 Educational Resources")
         st.write("---")
         
-        st.subheader("🎓 Understanding Investment Concepts")
+        st.subheader("🎓 Understanding Technical Analysis")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            with st.expander("📈 What is MACD?"):
+            with st.expander("📈 What is MACD?", expanded=True):
                 st.write("""
-                **Moving Average Convergence Divergence (MACD)** is a trend-following momentum indicator that shows the relationship between two moving averages of a security's price.
+                **Moving Average Convergence Divergence (MACD)** is a momentum indicator showing the relationship between two moving averages.
                 
                 **Components:**
-                - **MACD Line**: Difference between fast and slow EMAs
-                - **Signal Line**: EMA of the MACD line
-                - **Histogram**: Difference between MACD and Signal Line
+                - **MACD Line**: Fast EMA - Slow EMA (12-day - 26-day)
+                - **Signal Line**: 9-day EMA of MACD line
+                - **Histogram**: MACD - Signal Line
                 
                 **How to Use:**
-                - **Bullish Signal**: MACD crosses above Signal Line
-                - **Bearish Signal**: MACD crosses below Signal Line
+                - **Bullish**: MACD crosses above Signal line
+                - **Bearish**: MACD crosses below Signal line
                 - **Momentum**: Histogram turning from negative to positive indicates building bullish momentum
                 """)
             
             with st.expander("🟡 Golden Cross vs Death Cross"):
                 st.write("""
-                **Golden Cross** (Bullish):
-                - Short-term MA crosses ABOVE long-term MA
-                - Indicates potential trend reversal from bearish to bullish
-                - Considered a strong buy signal
+                **Golden Cross (Bullish):**
+                - 50-day MA crosses ABOVE 200-day MA
+                - Indicates long-term bullish reversal
+                - Historically leads to significant uptrends
                 
-                **Death Cross** (Bearish):
-                - Short-term MA crosses BELOW long-term MA
-                - Indicates potential trend reversal from bullish to bearish
-                - Considered a strong sell signal
+                **Death Cross (Bearish):**
+                - 50-day MA crosses BELOW 200-day MA
+                - Indicates long-term bearish reversal
+                - Often precedes market corrections
                 
-                Common periods: 50-day and 200-day moving averages
+                **For portfolio management:** Use crossovers to adjust exposure to different asset classes.
                 """)
         
         with col2:
-            with st.expander("📊 Modern Portfolio Theory"):
+            with st.expander("📊 How to Use Technical Analysis in Portfolio Management"):
                 st.write("""
-                **Modern Portfolio Theory (MPT)** - Developed by Harry Markowitz (Nobel Prize, 1952)
+                **Integration with Robo-Advisor:**
                 
-                **Key Principles:**
-                - Diversification reduces risk without sacrificing returns
-                - Optimal portfolios lie on the "Efficient Frontier"
-                - Focus on asset correlation, not individual returns
+                1. **Risk Profile Alignment**
+                   - Conservative: Focus on securities with bullish trends
+                   - Aggressive: Can tolerate more bearish signals for potential reversals
                 
-                **Benefits:**
-                - Maximizes returns for given risk level
-                - Minimizes risk for given return target
-                - Quantifies diversification benefits
+                2. **Rebalancing Triggers**
+                   - Use Death Cross to reduce overweight positions
+                   - Use Golden Cross to add to underweight positions
+                
+                3. **Timing Contributions**
+                   - Add new money during Golden Cross signals
+                   - Pause contributions during Death Cross signals
+                
+                4. **Risk Management**
+                   - Set stop-losses at recent support levels
+                   - Take profits when MACD histogram shows extreme readings
                 """)
             
-            with st.expander("🎲 Monte Carlo Simulation"):
+            with st.expander("⚠️ Limitations of Technical Analysis"):
                 st.write("""
-                **Monte Carlo Simulation** uses random sampling to model possible outcomes.
+                **Important Caveats:**
+                - Not 100% accurate - false signals occur
+                - Works best in trending markets, not sideways
+                - Should complement fundamental analysis
+                - Past patterns don't guarantee future results
+                - Best for short to medium-term decisions
+                - For long-term investing, focus more on fundamentals
                 
-                **In Investing:**
-                - Simulates thousands of possible market scenarios
-                - Accounts for market volatility and uncertainty
-                - Provides probability distributions of outcomes
+                **Our Recommendation:**
+                Use technical analysis for:
+                - Timing new investments
+                - Rebalancing decisions
+                - Short-term tactical adjustments
                 
-                **Limitations:**
-                - Assumes historical patterns continue
-                - Cannot predict black swan events
-                - Results are probabilistic, not certainties
+                Maintain strategic allocation based on your risk profile for long-term success.
                 """)
         
         st.write("---")
-        
         st.subheader("📖 Recommended Reading")
         
         col1, col2, col3 = st.columns(3)
-        
         with col1:
-            st.markdown("**Beginner Level**")
-            st.write("• The Little Book of Common Sense Investing - John Bogle")
-            st.write("• The Intelligent Investor - Benjamin Graham")
-            st.write("• A Random Walk Down Wall Street - Burton Malkiel")
+            st.markdown("**Technical Analysis**")
+            st.write("• Technical Analysis of Financial Markets - John Murphy")
+            st.write("• Japanese Candlestick Charting - Steve Nison")
+            st.write("• Encyclopedia of Chart Patterns - Thomas Bulkowski")
         
         with col2:
-            st.markdown("**Intermediate Level**")
-            st.write("• The Four Pillars of Investing - William Bernstein")
-            st.write("• Common Sense on Mutual Funds - John Bogle")
-            st.write("• The Bogleheads' Guide to Investing")
+            st.markdown("**Portfolio Management**")
+            st.write("• The Intelligent Asset Allocator - William Bernstein")
+            st.write("• Adaptive Asset Allocation - Adam Butler")
+            st.write("• The Ivy Portfolio - Meb Faber")
         
         with col3:
-            st.markdown("**Advanced Level**")
-            st.write("• Security Analysis - Benjamin Graham")
-            st.write("• Options, Futures, and Other Derivatives - John Hull")
-            st.write("• Quantitative Finance - Paul Wilmott")
+            st.markdown("**Behavioral Finance**")
+            st.write("• Thinking, Fast and Slow - Daniel Kahneman")
+            st.write("• Misbehaving - Richard Thaler")
+            st.write("• The Psychology of Money - Morgan Housel")
         
         st.write("---")
-        
-        st.subheader("⚠️ Important Reminders")
-        st.info("""
-        **Before Investing:**
-        1. Build an emergency fund (3-6 months of expenses)
-        2. Pay off high-interest debt
-        3. Define clear financial goals
-        4. Understand your risk tolerance
-        5. Consult with a licensed financial advisor
-        
-        **During Investing:**
-        - Rebalance portfolio annually
-        - Reinvest dividends for compound growth
-        - Stay invested through market cycles
-        - Avoid emotional decision-making
-        - Keep learning and improving your financial literacy
-        """)
+        st.info("💡 **Pro Tip:** Combine technical analysis with fundamental research. Use technicals for timing and fundamentals for selection.")
 
 # ========== RUN APPLICATION ==========
 if __name__ == "__main__":

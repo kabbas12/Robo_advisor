@@ -558,10 +558,36 @@ def technical_analysis_tab():
     st.caption("Complete MACD and Golden/Death Cross analysis with calculations, tables, and graphs")
     st.write("---")
     
-    # Security Selection
+    # Security Selection from ETF Database
     col1, col2 = st.columns([2, 1])
     with col1:
-        ticker_input = st.text_input("Enter Stock Ticker", value="AAPL", help="e.g., AAPL, MSFT, TSLA, SPY")
+        # Create list of ETF tickers with their names for display
+        etf_options = []
+        for ticker, info in ETF_DATABASE.items():
+            etf_options.append(f"{ticker} - {info['name']}")
+        
+        # Allow user to select from dropdown
+        selected_etf = st.selectbox(
+            "Select Security to Analyze",
+            options=etf_options,
+            index=1,  # Default to VTI
+            help="Choose from our curated list of ETFs"
+        )
+        
+        # Extract ticker from selection
+        ticker = selected_etf.split(" - ")[0]
+        
+        # Display security info
+        etf_info = ETF_DATABASE.get(ticker, {})
+        st.info(f"""
+        **{etf_info.get('name', ticker)}**
+        - Category: {etf_info.get('category', 'N/A')}
+        - Sector: {etf_info.get('sector', 'N/A')}
+        - Risk Level: {etf_info.get('risk_level', 'N/A')}
+        - Expense Ratio: {etf_info.get('expense_ratio', 0):.2f}%
+        - Dividend Yield: {etf_info.get('dividend_yield', 0):.1f}%
+        """)
+    
     with col2:
         period_options = {
             "1 Month": 30,
@@ -580,8 +606,6 @@ def technical_analysis_tab():
     st.write("---")
     
     if analyze_clicked:
-        ticker = ticker_input.upper().strip()
-        
         with st.spinner(f"Fetching and analyzing {ticker}..."):
             # Fetch data
             end_date = datetime.now()
@@ -796,14 +820,33 @@ def technical_analysis_tab():
                     st.metric("Overall Signal", overall)
                 
                 st.write("---")
+                
+                # Add portfolio context
+                st.subheader("💼 Portfolio Context")
+                st.write("""
+                **How this analysis fits in your portfolio:**
+                
+                1. **For Conservative Portfolios:** 
+                   - Technical signals help time bond ETF entries/exits
+                   - Use signals to adjust fixed income duration
+                   
+                2. **For Moderate Portfolios:**
+                   - Balance signals across equity and bond ETFs
+                   - Use crossovers for tactical allocation shifts
+                   
+                3. **For Aggressive Portfolios:**
+                   - Focus on equity ETF signals for growth opportunities
+                   - Use MACD for momentum-based sector rotation
+                """)
+                
                 st.info("💡 **Technical Analysis Note:** Technical indicators work best when combined with fundamental analysis. Always consider your risk tolerance and investment goals before making decisions.")
                 
             else:
-                st.error(f"❌ Failed to fetch data for {ticker}. Please check the ticker symbol and try again.")
-                st.info("💡 Make sure the ticker symbol is valid (e.g., AAPL, MSFT, TSLA, SPY)")
+                st.error(f"❌ Failed to fetch data for {ticker}. Please try again later.")
+                st.info("💡 Make sure you have an internet connection and Yahoo Finance is accessible.")
     
     else:
-        st.info("👈 Enter a stock ticker and click 'Analyze Security' to begin technical analysis")
+        st.info("👈 Select a security from the dropdown and click 'Analyze Security' to begin technical analysis")
         
         st.markdown("""
         ### 🎯 What this tool provides:
@@ -825,9 +868,11 @@ def technical_analysis_tab():
         - Provides actionable recommendation
         - Key metrics summary for quick reference
         
-        ### 📊 Popular Tickers to Analyze:
-        **Stocks:** AAPL, MSFT, GOOGL, AMZN, TSLA, NVDA, META, JPM, KO, PFE
-        **ETFs:** SPY, QQQ, VTI, BND, VXUS, IWM, TLT
+        ### 📊 Available ETFs for Analysis:
+        **Fixed Income:** BND, SHY, TLT
+        **Equity - US:** VTI, SPY, IWM
+        **Equity - International:** VXUS, EFA
+        **Growth:** QQQ
         **Commodities:** GLD
         """)
 

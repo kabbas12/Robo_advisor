@@ -640,17 +640,20 @@ def technical_analysis_tab(portfolio_details=None, risk_profile=None, investment
         'Sell Signals': r['Sell_Signals']
     } for r in analysis_results])
     
-    # Color code the Signal column
+    # Color code the Signal column using apply instead of applymap
     def color_signal(val):
         if val == 'BUY':
             return 'background-color: #d4edda; color: #155724'
         elif val == 'SELL':
             return 'background-color: #f8d7da; color: #721c24'
-        else:
+        elif val == 'NEUTRAL':
             return 'background-color: #fff3cd; color: #856404'
+        else:
+            return ''
     
-    st.dataframe(summary_df.style.applymap(color_signal, subset=['Signal']), 
-                use_container_width=True, hide_index=True)
+    # Apply styling using map for Series or styler.map for DataFrame
+    styled_df = summary_df.style.map(color_signal, subset=['Signal'])
+    st.dataframe(styled_df, use_container_width=True, hide_index=True)
     
     st.write("---")
     
@@ -794,7 +797,8 @@ def technical_analysis_tab(portfolio_details=None, risk_profile=None, investment
         ### ❌ Overall Technical Outlook: BEARISH
         
         **Summary:**
-        - {sell_count} securities showing SELL signals        - {buy_count} securities showing BUY signals
+        - {sell_count} securities showing SELL signals
+        - {buy_count} securities showing BUY signals
         - {neutral_count} securities showing NEUTRAL signals
         
         **Recommendation:**

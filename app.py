@@ -126,6 +126,13 @@ st.markdown("""
         border-radius: 10px;
         margin-bottom: 20px;
     }
+    .macd-table-header {
+        background-color: #2E86AB;
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1001,7 +1008,7 @@ def analyze_single_security(ticker, portfolio_context, days=365):
                 """)
 
 def display_portfolio_wide_analysis(portfolio_details):
-    """Display technical analysis for entire portfolio"""
+    """Display technical analysis for entire portfolio with aggregated MACD and Cross tables"""
     st.subheader("📊 Portfolio-Wide Technical Overview")
     st.write("Analyzing technical signals across all your portfolio holdings")
     
@@ -1022,6 +1029,8 @@ def display_portfolio_wide_analysis(portfolio_details):
         with st.spinner("📊 Analyzing all portfolio holdings..."):
             # Collect data for all holdings
             results = []
+            all_macd_data = []
+            all_cross_data = []
             progress_bar = st.progress(0)
             
             end_date = datetime.now()
@@ -1041,6 +1050,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                     cross_summary = get_cross_analysis_summary(df)
                     combined = get_combined_signal(macd_summary, cross_summary)
                     
+                    # Store results
                     results.append({
                         'Ticker': ticker,
                         'ETF Name': holding['ETF Name'],
@@ -1058,6 +1068,18 @@ def display_portfolio_wide_analysis(portfolio_details):
                         'Signal': combined['signal'],
                         'Recommendation': combined['signal']
                     })
+                    
+                    # Store MACD data for aggregated view
+                    macd_table = calculate_macd_table(df)
+                    if not macd_table.empty:
+                        macd_table['Ticker'] = ticker
+                        all_macd_data.append(macd_table)
+                    
+                    # Store Cross data for aggregated view
+                    cross_table = calculate_cross_table(df)
+                    if not cross_table.empty:
+                        cross_table['Ticker'] = ticker
+                        all_cross_data.append(cross_table)
                 
                 progress_bar.progress((idx + 1) / len(portfolio_details))
             
@@ -1088,8 +1110,99 @@ def display_portfolio_wide_analysis(portfolio_details):
                 
                 st.write("---")
                 
-                # ===== Signal Table (FIXED - No styling issues) =====
-                st.markdown("### 📋 Portfolio Technical Signals")
+                # ===== AGGREGATED MACD TABLE =====
+                if all_macd_data:
+                    st.markdown("### 📊 Aggregated MACD Analysis - All Holdings")
+                    st.write("Latest MACD values for each security in your portfolio")
+                    
+                    # Combine all MACD data
+                    combined_macd = pd.concat(all_macd_data, ignore_index=True)
+                    
+                    # Get the latest MACD for each ticker
+                    latest_macd = combined_macd.groupby('Ticker').first().reset_index()
+                    
+                    # Merge with portfolio allocation info
+                    macd_display = latest_macd[['Ticker', 'Date', 'Close', 'MACD', 'Signal Line', 'Histogram', 'Signal']].copy()
+                    
+                    # Add allocation info
+                    allocation_dict = {h['Ticker']: f"{h['Allocation %']:.1f}%" for h in portfolio_details}
+                    macd_display['Allocation'] = macd_display['Ticker'].map(allocation_dict)
+                    
+                    # Reorder columns
+                    macd_display = macd_display[['Ticker', 'Allocation', 'Date', 'Close', 'MACD', 'Signal Line', 'Histogram', 'Signal']]
+                    
+                    # Add emoji indicators
+                    def add_macd_indicator(val):
+                        if val == 'Bullish':
+                            return '🟢 Bullish'
+                        else:
+                            return '🔴 Bearish'
+                    
+                    macd_display['Signal'] = macd_display['Signal'].apply(add_macd_indicator)
+                    
+                    st.dataframe(macd_display, use_container_width=True, hide_index=True)
+                    
+                    # MACD Comparison Chart
+                    st.markdown("#### 📈 MACD Comparison Chart")
+                    fig_macd = go.Figure()
+                    
+                    for ticker in macd_display['Ticker'].unique():
+                        ticker_data = combined_macd[combined_macd['Ticker'] == ticker].tail(30)
+                        fig_macd.add_trace(go.Scatter(
+                            x=ticker_data['Date'],
+                            y=ticker_data['MACD'],
+                            mode='lines',
+                            name=f"{ticker} MACD",
+                            line=dict(width=2)
+                        ))
+                    
+                    fig_macd.update_layout(
+                        title="MACD Values Comparison Across Portfolio",
+                        xaxis_title="Date",
+                        yaxis_title="MACD Value",
+                        height=400,
+                        hovermode='x unified',
+                        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+                    )
+                    st.plotly_chart(fig_macd, use_container_width=True)
+                    
+                    st.write("---")
+                
+                # ===== AGGREGATED CROSS TABLE =====
+                if all_cross_data:
+                    st.markdown("### 🟡 Golden Cross vs 🔴 Death Cross - All Holdings")
+                    st.write("Historical crossover events for each security in your portfolio")
+                    
+                    # Combine all cross data
+                    combined_cross = pd.concat(all_cross_data, ignore_index=True)
+                    
+                    # Display recent crossovers
+                    if not combined_cross.empty:
+                        cross_display = combined_cross[['Ticker', 'Date', 'Type', 'Short MA', 'Long MA', 'Price at Signal', 'Signal Strength']].copy()
+                        st.dataframe(cross_display, use_container_width=True, hide_index=True)
+                        
+                        # Cross Summary Chart
+                        st.markdown("#### 📊 Crossover Summary by Security")
+                        
+                        # Count crossovers per ticker
+                        cross_counts = combined_cross.groupby(['Ticker', 'Type']).size().reset_index(name='Count')
+                        
+                        fig_cross = px.bar(cross_counts, x='Ticker', y='Count', color='Type',
+                                         title='Golden vs Death Cross Counts by Security',
+                                         color_discrete_map={
+                                             '🟢 Golden Cross (BUY)': '#28a745',
+                                             '🔴 Death Cross (SELL)': '#dc3545'
+                                         },
+                                         barmode='group')
+                        fig_cross.update_layout(height=400)
+                        st.plotly_chart(fig_cross, use_container_width=True)
+                    else:
+                        st.info("No Golden Cross or Death Cross events detected in the analysis period.")
+                    
+                    st.write("---")
+                
+                # ===== Signal Table =====
+                st.markdown("### 📋 Portfolio Technical Signals Summary")
                 
                 display_cols = ['Ticker', 'ETF Name', 'Allocation %', 'Current Price', 'Trend', 
                               'MACD Status', 'MA Status', 'Signal Score', 'Signal']
@@ -1110,7 +1223,6 @@ def display_portfolio_wide_analysis(portfolio_details):
                 
                 display_df['Signal'] = display_df['Signal'].apply(add_signal_indicator)
                 
-                # Display using st.dataframe (no styling issues)
                 st.dataframe(display_df, use_container_width=True, hide_index=True)
                 
                 st.write("---")
@@ -1121,7 +1233,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                 # Group by category
                 category_analysis = results_df.groupby('Category').agg({
                     'Signal Score': 'mean',
-                    'Signal': lambda x: max(x, key=x.value_counts().get)  # Most common signal
+                    'Signal': lambda x: max(x, key=x.value_counts().get)
                 }).reset_index()
                 
                 category_analysis['Signal Score'] = category_analysis['Signal Score'].apply(lambda x: f"{x:.1f}/10")
@@ -1137,7 +1249,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
-                    # Pie chart of signals by category - using sunburst for better visualization
+                    # Sunburst chart of signals by category
                     category_counts = results_df.groupby(['Category', 'Signal']).size().reset_index(name='Count')
                     fig = px.sunburst(category_counts, path=['Category', 'Signal'], values='Count',
                                      title='Signal Distribution by Asset Class')
@@ -1158,7 +1270,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                     score = row['Signal Score']
                     
                     if 'BUY' in signal:
-                        if allocation < 15:  # Underweight
+                        if allocation < 15:
                             suggestions.append({
                                 'Ticker': ticker,
                                 'Action': '🟢 Increase',
@@ -1167,7 +1279,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                                 'Reason': f"Bullish signal (score: {score})"
                             })
                     elif 'SELL' in signal:
-                        if allocation > 10:  # Overweight
+                        if allocation > 10:
                             suggestions.append({
                                 'Ticker': ticker,
                                 'Action': '🔴 Decrease',

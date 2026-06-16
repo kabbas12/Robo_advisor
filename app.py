@@ -1088,7 +1088,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                 
                 st.write("---")
                 
-                # ===== Signal Table =====
+                # ===== Signal Table (FIXED - No styling issues) =====
                 st.markdown("### 📋 Portfolio Technical Signals")
                 
                 display_cols = ['Ticker', 'ETF Name', 'Allocation %', 'Current Price', 'Trend', 
@@ -1097,18 +1097,21 @@ def display_portfolio_wide_analysis(portfolio_details):
                 display_df = results_df[display_cols].copy()
                 display_df['Allocation %'] = display_df['Allocation %'].apply(lambda x: f"{x:.1f}%")
                 display_df['Current Price'] = display_df['Current Price'].apply(lambda x: f"${x:.2f}")
+                display_df['Signal Score'] = display_df['Signal Score'].apply(lambda x: f"{x:.1f}/10")
                 
-                # Color-code the Signal column
-                def color_signal(val):
+                # Add emoji indicators for signals
+                def add_signal_indicator(val):
                     if 'BUY' in val:
-                        return 'background-color: #d4edda; color: #155724;'
+                        return f"🟢 {val}"
                     elif 'SELL' in val:
-                        return 'background-color: #f8d7da; color: #721c24;'
+                        return f"🔴 {val}"
                     else:
-                        return 'background-color: #fff3cd; color: #856404;'
+                        return f"🟡 {val}"
                 
-                st.dataframe(display_df.style.applymap(color_signal, subset=['Signal']), 
-                           use_container_width=True, hide_index=True)
+                display_df['Signal'] = display_df['Signal'].apply(add_signal_indicator)
+                
+                # Display using st.dataframe (no styling issues)
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
                 
                 st.write("---")
                 
@@ -1134,7 +1137,7 @@ def display_portfolio_wide_analysis(portfolio_details):
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
-                    # Pie chart of signals by category
+                    # Pie chart of signals by category - using sunburst for better visualization
                     category_counts = results_df.groupby(['Category', 'Signal']).size().reset_index(name='Count')
                     fig = px.sunburst(category_counts, path=['Category', 'Signal'], values='Count',
                                      title='Signal Distribution by Asset Class')

@@ -79,6 +79,53 @@ st.markdown("""
         border-radius: 5px;
         text-align: center;
     }
+    .signal-strong-buy {
+        background: linear-gradient(90deg, #28a745, #20c997);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .signal-buy {
+        background: linear-gradient(90deg, #5cb85c, #7ccd7c);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .signal-hold {
+        background: linear-gradient(90deg, #ffc107, #ffd44d);
+        color: #333;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .signal-sell {
+        background: linear-gradient(90deg, #dc3545, #e74c6f);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .signal-strong-sell {
+        background: linear-gradient(90deg, #c0392b, #e74c3c);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .portfolio-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -523,12 +570,23 @@ def get_macd_analysis_summary(df):
     macd_status = "Bullish" if current_macd > current_signal else "Bearish"
     hist_status = "Increasing" if current_hist > df['MACD_Histogram'].iloc[-2] else "Decreasing"
     
+    # Calculate signal strength
+    if macd_status == "Bullish" and hist_status == "Increasing":
+        strength = "Strong Bullish"
+    elif macd_status == "Bullish" and hist_status == "Decreasing":
+        strength = "Weak Bullish"
+    elif macd_status == "Bearish" and hist_status == "Decreasing":
+        strength = "Strong Bearish"
+    else:
+        strength = "Weak Bearish"
+    
     return {
         'macd_value': current_macd,
         'signal_value': current_signal,
         'histogram': current_hist,
         'status': macd_status,
         'histogram_trend': hist_status,
+        'strength': strength,
         'recent_cross': "Bullish" if df['MACD_Bullish_Cross'].iloc[-5:].any() else "Bearish" if df['MACD_Bearish_Cross'].iloc[-5:].any() else "None"
     }
 
@@ -540,6 +598,13 @@ def get_cross_analysis_summary(df):
     golden_crosses = df[df['Golden_Cross'] == True]
     death_crosses = df[df['Death_Cross'] == True]
     
+    # Calculate days since last crossover
+    days_since_last = 0
+    if len(golden_crosses) > 0 or len(death_crosses) > 0:
+        last_cross = max(golden_crosses.index[-1] if len(golden_crosses) > 0 else df.index[0],
+                        death_crosses.index[-1] if len(death_crosses) > 0 else df.index[0])
+        days_since_last = (df.index[-1] - last_cross).days
+    
     return {
         'short_ma': current_short_ma,
         'long_ma': current_long_ma,
@@ -548,47 +613,182 @@ def get_cross_analysis_summary(df):
         'total_golden': len(golden_crosses),
         'total_death': len(death_crosses),
         'last_golden': golden_crosses.index[-1] if len(golden_crosses) > 0 else None,
-        'last_death': death_crosses.index[-1] if len(death_crosses) > 0 else None
+        'last_death': death_crosses.index[-1] if len(death_crosses) > 0 else None,
+        'days_since_last': days_since_last,
+        'golden_ratio': len(golden_crosses) / (len(golden_crosses) + len(death_crosses)) if (len(golden_crosses) + len(death_crosses)) > 0 else 0
     }
 
-# ========== TECHNICAL ANALYSIS TAB ==========
+def get_combined_signal(macd_summary, cross_summary):
+    """Get combined technical signal"""
+    macd_bullish = macd_summary['status'] == "Bullish"
+    cross_bullish = "Bullish" in cross_summary['relationship']
+    
+    # Calculate signal strength score (1-10)
+    score = 5  # Neutral
+    if macd_bullish:
+        score += 2
+    if cross_bullish:
+        score += 2
+    if macd_summary['strength'] == "Strong Bullish":
+        score += 1
+    if macd_summary['strength'] == "Strong Bearish":
+        score -= 1
+    if cross_summary['golden_ratio'] > 0.6:
+        score += 1
+    elif cross_summary['golden_ratio'] < 0.4:
+        score -= 1
+    
+    # Clamp score
+    score = max(1, min(10, score))
+    
+    # Determine signal
+    if score >= 8:
+        signal = "Strong BUY"
+        css_class = "signal-strong-buy"
+    elif score >= 6:
+        signal = "BUY"
+        css_class = "signal-buy"
+    elif score >= 4:
+        signal = "HOLD"
+        css_class = "signal-hold"
+    elif score >= 2:
+        signal = "SELL"
+        css_class = "signal-sell"
+    else:
+        signal = "Strong SELL"
+        css_class = "signal-strong-sell"
+    
+    return {
+        'score': score,
+        'signal': signal,
+        'css_class': css_class,
+        'macd_bullish': macd_bullish,
+        'cross_bullish': cross_bullish,
+        'recommendation': signal
+    }
+
+# ========== TECHNICAL ANALYSIS TAB (INTEGRATED) ==========
 def technical_analysis_tab():
-    """Display Technical Analysis tab content"""
+    """Display integrated Technical Analysis tab content"""
     st.header("📈 Technical Analysis")
-    st.caption("Complete MACD and Golden/Death Cross analysis with calculations, tables, and graphs")
+    st.caption("Complete MACD and Golden/Death Cross analysis for your portfolio securities")
     st.write("---")
     
-    # Security Selection from ETF Database
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        # Create list of ETF tickers with their names for display
+    # Check if portfolio exists
+    portfolio_exists = st.session_state.get('portfolio_generated', False) and st.session_state.get('portfolio_details') is not None
+    
+    # Display portfolio context if available
+    if portfolio_exists:
+        portfolio_details = st.session_state.portfolio_details
+        total_investment = st.session_state.initial_amount
+        
+        # Portfolio header
+        st.markdown(f"""
+        <div class="portfolio-header">
+            <h3>💼 Your Portfolio Context</h3>
+            <p>Total Investment: <strong>${total_investment:,.0f}</strong> | 
+            Holdings: <strong>{len(portfolio_details)}</strong> ETFs |
+            Risk Profile: <strong>{st.session_state.risk_profile}</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show portfolio summary table
+        with st.expander("📊 View Your Portfolio Holdings", expanded=False):
+            summary_df = pd.DataFrame(portfolio_details)
+            display_cols = ["Ticker", "ETF Name", "Category", "Allocation %", "Amount ($)", "Risk Level"]
+            display_df = summary_df[display_cols].copy()
+            display_df["Allocation %"] = display_df["Allocation %"].apply(lambda x: f"{x:.1f}%")
+            display_df["Amount ($)"] = display_df["Amount ($)"].apply(lambda x: f"${x:,.0f}")
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        # Get portfolio tickers
+        portfolio_tickers = [item['Ticker'] for item in portfolio_details]
+        ticker_to_allocation = {item['Ticker']: item['Allocation %'] for item in portfolio_details}
+        
+        st.write("---")
+        
+        # Analysis mode selector
+        analysis_mode = st.radio(
+            "📌 Select Analysis Mode",
+            ["🔍 Individual Security Analysis", "📊 Portfolio-Wide Technical Overview"],
+            horizontal=True,
+            help="Analyze a single security in depth OR get an overview of all portfolio holdings"
+        )
+        
+        st.write("---")
+        
+        if analysis_mode == "🔍 Individual Security Analysis":
+            # Individual security analysis
+            display_individual_analysis(portfolio_tickers, ticker_to_allocation)
+        else:
+            # Portfolio-wide analysis
+            display_portfolio_wide_analysis(portfolio_details)
+            
+    else:
+        # No portfolio exists - show all ETFs
+        st.warning("⚠️ No portfolio generated yet. Please go to the 'Portfolio Advisor' tab first to create your portfolio.")
+        st.info("💡 You can still analyze individual securities from our database below.")
+        
+        # Show all ETFs for analysis
         etf_options = []
         for ticker, info in ETF_DATABASE.items():
             etf_options.append(f"{ticker} - {info['name']}")
         
-        # Allow user to select from dropdown
         selected_etf = st.selectbox(
             "Select Security to Analyze",
             options=etf_options,
-            index=1,  # Default to VTI
+            index=1,
             help="Choose from our curated list of ETFs"
         )
         
-        # Extract ticker from selection
         ticker = selected_etf.split(" - ")[0]
         
-        # Display security info
-        etf_info = ETF_DATABASE.get(ticker, {})
-        st.info(f"""
-        **{etf_info.get('name', ticker)}**
-        - Category: {etf_info.get('category', 'N/A')}
-        - Sector: {etf_info.get('sector', 'N/A')}
-        - Risk Level: {etf_info.get('risk_level', 'N/A')}
-        - Expense Ratio: {etf_info.get('expense_ratio', 0):.2f}%
-        - Dividend Yield: {etf_info.get('dividend_yield', 0):.1f}%
-        """)
+        if st.button("🔍 Analyze Security", type="primary"):
+            analyze_single_security(ticker, None)
+
+def display_individual_analysis(portfolio_tickers, ticker_to_allocation):
+    """Display individual security analysis with portfolio context"""
     
-    with col2:
+    # Create options with portfolio context
+    etf_options = []
+    for ticker in portfolio_tickers:
+        info = ETF_DATABASE.get(ticker, {})
+        allocation = ticker_to_allocation.get(ticker, 0)
+        etf_options.append(f"{ticker} - {info.get('name', ticker)} ({allocation:.0f}% of portfolio)")
+    
+    # Add option to analyze all ETFs (including non-portfolio)
+    etf_options.append("--- Show All Available ETFs ---")
+    
+    selected_option = st.selectbox(
+        "🔍 Select Security to Analyze",
+        options=etf_options,
+        help="Securities from your portfolio are shown with their allocation percentage"
+    )
+    
+    # Determine if user wants to see all ETFs
+    if selected_option == "--- Show All Available ETFs ---":
+        all_etf_options = []
+        for ticker, info in ETF_DATABASE.items():
+            all_etf_options.append(f"{ticker} - {info['name']}")
+        
+        selected_etf = st.selectbox(
+            "Select Security from Full Database",
+            options=all_etf_options,
+            index=1
+        )
+        ticker = selected_etf.split(" - ")[0]
+        portfolio_context = None
+    else:
+        # Extract ticker from selection
+        ticker = selected_option.split(" - ")[0]
+        portfolio_context = {
+            'allocation': ticker_to_allocation.get(ticker, 0),
+            'is_in_portfolio': True
+        }
+    
+    # Period selector
+    col1, col2 = st.columns([2, 1])
+    with col1:
         period_options = {
             "1 Month": 30,
             "3 Months": 90,
@@ -598,283 +798,405 @@ def technical_analysis_tab():
             "3 Years": 1095,
             "5 Years": 1825
         }
-        selected_period = st.selectbox("Analysis Period", list(period_options.keys()), index=3)
+        selected_period = st.selectbox("📅 Analysis Period", list(period_options.keys()), index=3)
         days = period_options[selected_period]
     
-    analyze_clicked = st.button("🔍 Analyze Security", type="primary", use_container_width=False)
-    
-    st.write("---")
+    with col2:
+        st.write("")
+        st.write("")
+        analyze_clicked = st.button("🔍 Run Analysis", type="primary", use_container_width=True)
     
     if analyze_clicked:
-        with st.spinner(f"Fetching and analyzing {ticker}..."):
-            # Fetch data
+        analyze_single_security(ticker, portfolio_context, days)
+
+def analyze_single_security(ticker, portfolio_context, days=365):
+    """Run complete technical analysis for a single security"""
+    
+    with st.spinner(f"📊 Analyzing {ticker}..."):
+        # Fetch data
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        data = fetch_stock_data(ticker, start_date, end_date)
+        
+        if data is None or data.empty:
+            st.error(f"❌ Failed to fetch data for {ticker}. Please try again later.")
+            return
+        
+        # Calculate indicators
+        df = calculate_technical_indicators(data)
+        
+        # Get ETF info
+        etf_info = ETF_DATABASE.get(ticker, {})
+        
+        # Display security header with portfolio context
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+        with col1:
+            st.subheader(f"📊 {ticker} - {etf_info.get('name', ticker)}")
+            if portfolio_context and portfolio_context.get('is_in_portfolio', False):
+                st.caption(f"💼 Portfolio Allocation: {portfolio_context['allocation']:.1f}%")
+        
+        with col2:
+            st.metric("Current Price", f"${df['Close'].iloc[-1]:.2f}")
+        with col3:
+            st.metric("Trend", df['Trend'].iloc[-1])
+        with col4:
+            volume = df['Volume'].iloc[-1]
+            st.metric("Volume", f"{volume:,.0f}")
+        
+        st.write("---")
+        
+        # Get analysis summaries
+        macd_summary = get_macd_analysis_summary(df)
+        cross_summary = get_cross_analysis_summary(df)
+        combined_signal = get_combined_signal(macd_summary, cross_summary)
+        
+        # Display combined signal prominently
+        st.markdown(f"""
+        <div class="{combined_signal['css_class']}" style="margin: 20px 0;">
+            <h2>🎯 Overall Technical Signal: {combined_signal['signal']}</h2>
+            <p>Signal Strength Score: {combined_signal['score']}/10</p>
+            <p>MACD: {'Bullish ✅' if combined_signal['macd_bullish'] else 'Bearish ❌'} | 
+            Moving Average: {'Bullish ✅' if combined_signal['cross_bullish'] else 'Bearish ❌'}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # ===== MACD SECTION =====
+        st.markdown("## 📈 MACD Analysis")
+        st.write("Moving Average Convergence Divergence - momentum indicator showing trend strength and direction")
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            # MACD Graph
+            macd_fig = plot_macd_graph(df, ticker)
+            st.plotly_chart(macd_fig, use_container_width=True)
+        
+        with col2:
+            # MACD Summary Cards
+            st.markdown("**🔍 Current MACD Status**")
+            
+            if macd_summary['status'] == "Bullish":
+                st.markdown("""
+                <div class="buy-signal">
+                    <strong>✅ Bullish Momentum</strong><br>
+                    MACD above Signal Line
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="sell-signal">
+                    <strong>❌ Bearish Momentum</strong><br>
+                    MACD below Signal Line
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.write("")
+            st.markdown(f"**MACD Value:** {macd_summary['macd_value']:.4f}")
+            st.markdown(f"**Signal Line:** {macd_summary['signal_value']:.4f}")
+            st.markdown(f"**Histogram:** {macd_summary['histogram']:.4f}")
+            st.markdown(f"**Histogram Trend:** {macd_summary['histogram_trend']}")
+            st.markdown(f"**Signal Strength:** {macd_summary['strength']}")
+            
+            if macd_summary['recent_cross'] != "None":
+                st.markdown(f"**Recent Crossover:** {macd_summary['recent_cross']} 📌")
+        
+        # MACD Table
+        with st.expander("📋 View MACD Calculations (Last 10 Days)", expanded=False):
+            macd_table = calculate_macd_table(df)
+            if not macd_table.empty:
+                st.dataframe(macd_table, use_container_width=True, hide_index=True)
+        
+        st.write("---")
+        
+        # ===== GOLDEN CROSS vs DEATH CROSS SECTION =====
+        st.markdown("## 🟡 Golden Cross vs 🔴 Death Cross Analysis")
+        st.write("Moving average crossovers help identify long-term trend reversals and significant price movements")
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            # Cross Graph
+            cross_fig = plot_golden_death_cross_graph(df, ticker)
+            st.plotly_chart(cross_fig, use_container_width=True)
+        
+        with col2:
+            # Cross Summary Cards
+            st.markdown("**🔍 Current MA Status**")
+            
+            if "Bullish" in cross_summary['relationship']:
+                st.markdown(f"""
+                <div class="golden-cross">
+                    <strong>🟢 GOLDEN CROSS ACTIVE</strong><br>
+                    MA20 (${cross_summary['short_ma']:.2f}) > MA50 (${cross_summary['long_ma']:.2f})<br>
+                    Difference: ${cross_summary['difference']:.2f}
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="death-cross">
+                    <strong>🔴 DEATH CROSS ACTIVE</strong><br>
+                    MA20 (${cross_summary['short_ma']:.2f}) < MA50 (${cross_summary['long_ma']:.2f})<br>
+                    Difference: ${cross_summary['difference']:.2f}
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.write("")
+            st.markdown(f"**Total Golden Crosses:** {cross_summary['total_golden']}")
+            st.markdown(f"**Total Death Crosses:** {cross_summary['total_death']}")
+            st.markdown(f"**Days Since Last Crossover:** {cross_summary['days_since_last']}")
+            
+            if cross_summary['total_golden'] > cross_summary['total_death']:
+                st.success("✅ More Golden Cross signals - bullish bias")
+            elif cross_summary['total_death'] > cross_summary['total_golden']:
+                st.error("❌ More Death Cross signals - bearish bias")
+            else:
+                st.warning("⚖️ Equal bullish and bearish signals")
+        
+        # Cross Table
+        with st.expander("📋 View Crossover History", expanded=False):
+            cross_table = calculate_cross_table(df)
+            if not cross_table.empty:
+                st.dataframe(cross_table, use_container_width=True, hide_index=True)
+            else:
+                st.info("No Golden Cross or Death Cross events detected in the analysis period.")
+        
+        st.write("---")
+        
+        # ===== PORTFOLIO CONTEXT RECOMMENDATION =====
+        if portfolio_context and portfolio_context.get('is_in_portfolio', False):
+            st.markdown("## 💼 Portfolio Context Recommendation")
+            
+            allocation = portfolio_context['allocation']
+            signal = combined_signal['signal']
+            
+            if "BUY" in signal:
+                if allocation < 15:
+                    st.success(f"""
+                    ✅ **Consider Increasing Position**  
+                    Current allocation: {allocation:.1f}%  
+                    Technical signal is bullish ({signal}) - consider increasing this position in your portfolio.
+                    """)
+                else:
+                    st.info(f"""
+                    ℹ️ **Maintain Current Position**  
+                    Current allocation: {allocation:.1f}%  
+                    Technical signal is bullish ({signal}) - your position is already well-sized.
+                    """)
+            elif "SELL" in signal:
+                if allocation > 10:
+                    st.warning(f"""
+                    ⚠️ **Consider Reducing Position**  
+                    Current allocation: {allocation:.1f}%  
+                    Technical signal is bearish ({signal}) - consider trimming this position.
+                    """)
+                else:
+                    st.info(f"""
+                    ℹ️ **Monitor Closely**  
+                    Current allocation: {allocation:.1f}%  
+                    Technical signal is bearish ({signal}) but position is small - consider holding.
+                    """)
+            else:
+                st.info(f"""
+                ℹ️ **Hold Current Position**  
+                Current allocation: {allocation:.1f}%  
+                Technical signal is neutral ({signal}) - maintain current allocation.
+                """)
+
+def display_portfolio_wide_analysis(portfolio_details):
+    """Display technical analysis for entire portfolio"""
+    st.subheader("📊 Portfolio-Wide Technical Overview")
+    st.write("Analyzing technical signals across all your portfolio holdings")
+    
+    # Period selector for portfolio analysis
+    period_options = {
+        "1 Month": 30,
+        "3 Months": 90,
+        "6 Months": 180,
+        "1 Year": 365,
+        "2 Years": 730
+    }
+    selected_period = st.selectbox("📅 Analysis Period", list(period_options.keys()), index=3)
+    days = period_options[selected_period]
+    
+    analyze_portfolio_clicked = st.button("📊 Analyze Entire Portfolio", type="primary")
+    
+    if analyze_portfolio_clicked:
+        with st.spinner("📊 Analyzing all portfolio holdings..."):
+            # Collect data for all holdings
+            results = []
+            progress_bar = st.progress(0)
+            
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
-            data = fetch_stock_data(ticker, start_date, end_date)
             
-            if data is not None and not data.empty:
-                # Calculate indicators
-                df = calculate_technical_indicators(data)
+            for idx, holding in enumerate(portfolio_details):
+                ticker = holding['Ticker']
+                allocation = holding['Allocation %']
+                amount = holding['Amount ($)']
                 
-                # Display current price and basic info
-                st.subheader(f"📊 {ticker} - Current Market Data")
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Current Price", f"${df['Close'].iloc[-1]:.2f}")
-                with col2:
-                    st.metric("Volume", f"{df['Volume'].iloc[-1]:,.0f}")
-                with col3:
-                    st.metric("Trend", df['Trend'].iloc[-1])
-                with col4:
-                    high_low = df['High'].iloc[-1] - df['Low'].iloc[-1]
-                    st.metric("Day Range", f"${df['Low'].iloc[-1]:.2f} - ${df['High'].iloc[-1]:.2f}")
+                # Fetch data
+                data = fetch_stock_data(ticker, start_date, end_date)
                 
-                st.write("---")
-                
-                # Get summaries
-                macd_summary = get_macd_analysis_summary(df)
-                cross_summary = get_cross_analysis_summary(df)
-                
-                # ===== MACD SECTION =====
-                st.markdown("## 📈 MACD (Moving Average Convergence Divergence) Analysis")
-                st.write("MACD helps identify momentum and trend direction through the relationship between moving averages.")
-                
-                # MACD Graph
-                st.subheader("📊 MACD Chart")
-                macd_fig = plot_macd_graph(df, ticker)
-                st.plotly_chart(macd_fig, use_container_width=True)
-                
-                # MACD Calculations Table
-                st.subheader("📋 MACD Recent Calculations (Last 10 Days)")
-                macd_table = calculate_macd_table(df)
-                if not macd_table.empty:
-                    st.dataframe(macd_table, use_container_width=True, hide_index=True)
-                
-                # MACD Interpretation
-                st.subheader("🔍 MACD Interpretation")
-                col_m1, col_m2 = st.columns(2)
-                
-                with col_m1:
-                    if macd_summary['status'] == "Bullish":
-                        st.markdown("""
-                        <div class="buy-signal">
-                            <strong>✅ MACD Bullish Signal</strong><br>
-                            MACD line is above the Signal line, indicating upward momentum.
-                            This suggests potential price appreciation in the near term.
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown("""
-                        <div class="sell-signal">
-                            <strong>❌ MACD Bearish Signal</strong><br>
-                            MACD line is below the Signal line, indicating downward momentum.
-                            This suggests potential price depreciation in the near term.
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                with col_m2:
-                    if macd_summary['histogram_trend'] == "Increasing" and macd_summary['status'] == "Bullish":
-                        st.markdown("""
-                        <div class="buy-signal">
-                            <strong>📈 Increasing Bullish Momentum</strong><br>
-                            Histogram is positive and increasing, confirming strong bullish momentum.
-                        </div>
-                        """, unsafe_allow_html=True)
-                    elif macd_summary['histogram_trend'] == "Decreasing" and macd_summary['status'] == "Bearish":
-                        st.markdown("""
-                        <div class="sell-signal">
-                            <strong>📉 Increasing Bearish Momentum</strong><br>
-                            Histogram is negative and decreasing, confirming strong bearish momentum.
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown("""
-                        <div class="neutral-signal">
-                            <strong>⚠️ Mixed Momentum Signals</strong><br>
-                            Monitor for clearer trend confirmation before making decisions.
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                st.write("---")
-                
-                # ===== GOLDEN CROSS vs DEATH CROSS SECTION =====
-                st.markdown("## 🟡 Golden Cross vs 🔴 Death Cross Analysis")
-                st.write("Moving Average crossovers help identify long-term trend reversals and significant price movements.")
-                
-                # Golden/Death Cross Graph
-                st.subheader("📊 Golden Cross vs Death Cross Chart")
-                cross_fig = plot_golden_death_cross_graph(df, ticker)
-                st.plotly_chart(cross_fig, use_container_width=True)
-                
-                # Cross History Table
-                st.subheader("📋 Crossover History")
-                cross_table = calculate_cross_table(df)
-                if not cross_table.empty:
-                    st.dataframe(cross_table, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No Golden Cross or Death Cross events detected in the analysis period.")
-                
-                # Cross Interpretation
-                st.subheader("🔍 Crossover Interpretation")
-                
-                col_c1, col_c2 = st.columns(2)
-                
-                with col_c1:
-                    st.markdown("**Current MA Status:**")
-                    if "Bullish" in cross_summary['relationship']:
-                        st.markdown(f"""
-                        <div class="golden-cross">
-                            <strong>🟢 GOLDEN CROSS ACTIVE</strong><br>
-                            Short MA (${cross_summary['short_ma']:.2f}) > Long MA (${cross_summary['long_ma']:.2f})<br>
-                            Difference: ${cross_summary['difference']:.2f}<br>
-                            <strong>Signal:</strong> Bullish - Consider increasing exposure
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="death-cross">
-                            <strong>🔴 DEATH CROSS ACTIVE</strong><br>
-                            Short MA (${cross_summary['short_ma']:.2f}) < Long MA (${cross_summary['long_ma']:.2f})<br>
-                            Difference: ${cross_summary['difference']:.2f}<br>
-                            <strong>Signal:</strong> Bearish - Consider reducing exposure
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                with col_c2:
-                    st.markdown("**Historical Crossovers:**")
-                    st.write(f"• **Golden Crosses:** {cross_summary['total_golden']} occurrences")
-                    st.write(f"• **Death Crosses:** {cross_summary['total_death']} occurrences")
+                if data is not None and not data.empty:
+                    df = calculate_technical_indicators(data)
+                    macd_summary = get_macd_analysis_summary(df)
+                    cross_summary = get_cross_analysis_summary(df)
+                    combined = get_combined_signal(macd_summary, cross_summary)
                     
-                    if cross_summary['total_golden'] > cross_summary['total_death']:
-                        st.success("More Golden Cross signals indicate overall bullish bias")
-                    elif cross_summary['total_death'] > cross_summary['total_golden']:
-                        st.error("More Death Cross signals indicate overall bearish bias")
-                    else:
-                        st.warning("Equal number of bullish and bearish signals")
+                    results.append({
+                        'Ticker': ticker,
+                        'ETF Name': holding['ETF Name'],
+                        'Allocation %': allocation,
+                        'Amount ($)': amount,
+                        'Category': holding['Category'],
+                        'Current Price': df['Close'].iloc[-1],
+                        'Trend': df['Trend'].iloc[-1],
+                        'MACD Status': macd_summary['status'],
+                        'MACD Strength': macd_summary['strength'],
+                        'MA Status': 'Bullish' if "Bullish" in cross_summary['relationship'] else 'Bearish',
+                        'Golden Crosses': cross_summary['total_golden'],
+                        'Death Crosses': cross_summary['total_death'],
+                        'Signal Score': combined['score'],
+                        'Signal': combined['signal'],
+                        'Recommendation': combined['signal']
+                    })
                 
-                st.write("---")
+                progress_bar.progress((idx + 1) / len(portfolio_details))
+            
+            progress_bar.empty()
+            
+            if results:
+                # Convert to DataFrame
+                results_df = pd.DataFrame(results)
                 
-                # ===== COMBINED RECOMMENDATION =====
-                st.subheader("🎯 Combined Technical Recommendation")
-                
-                # Calculate overall signal
-                macd_bullish = macd_summary['status'] == "Bullish"
-                cross_bullish = "Bullish" in cross_summary['relationship']
-                
-                if macd_bullish and cross_bullish:
-                    st.success(f"""
-                    ### ✅ STRONG BULLISH SIGNAL - {ticker}
-                    
-                    **Recommendation:** BUY / ACCUMULATE
-                    
-                    **Rationale:**
-                    - MACD indicates bullish momentum
-                    - Golden Cross active (bullish MA crossover)
-                    - Both primary indicators align positively
-                    
-                    **Action:** Consider adding to position with stop-loss below recent support.
-                    """)
-                elif macd_bullish or cross_bullish:
-                    st.warning(f"""
-                    ### ⚠️ MODERATE BULLISH SIGNAL - {ticker}
-                    
-                    **Recommendation:** HOLD / ACCUMULATE CAUTIOUSLY
-                    
-                    **Rationale:**
-                    - Mixed signals between MACD and MA crossovers
-                    - One indicator shows bullishness while other is neutral/bearish
-                    - Wait for confirmation before increasing exposure
-                    
-                    **Action:** Maintain current position, watch for confirmation.
-                    """)
-                else:
-                    st.error(f"""
-                    ### ❌ BEARISH SIGNAL - {ticker}
-                    
-                    **Recommendation:** SELL / REDUCE
-                    
-                    **Rationale:**
-                    - MACD indicates bearish momentum
-                    - Death Cross active (bearish MA crossover)
-                    - Both primary indicators align negatively
-                    
-                    **Action:** Consider reducing position or implementing tighter stops.
-                    """)
-                
-                st.write("---")
+                # ===== Portfolio Signal Dashboard =====
+                st.markdown("### 🎯 Portfolio Signal Dashboard")
                 
                 # Summary metrics
-                st.subheader("📊 Key Technical Metrics")
+                bullish_count = len(results_df[results_df['Signal'].str.contains('BUY')])
+                bearish_count = len(results_df[results_df['Signal'].str.contains('SELL')])
+                hold_count = len(results_df[results_df['Signal'] == 'HOLD'])
                 
-                metrics_cols = st.columns(5)
-                with metrics_cols[0]:
-                    st.metric("MACD Status", macd_summary['status'])
-                with metrics_cols[1]:
-                    st.metric("MA Status", "Bullish" if cross_bullish else "Bearish")
-                with metrics_cols[2]:
-                    st.metric("Golden Crosses", cross_summary['total_golden'])
-                with metrics_cols[3]:
-                    st.metric("Death Crosses", cross_summary['total_death'])
-                with metrics_cols[4]:
-                    overall = "BUY" if (macd_bullish and cross_bullish) else "SELL" if (not macd_bullish and not cross_bullish) else "HOLD"
-                    st.metric("Overall Signal", overall)
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("📈 Bullish Signals", bullish_count, delta=f"{bullish_count/len(results)*100:.0f}%")
+                with col2:
+                    st.metric("📉 Bearish Signals", bearish_count, delta=f"{bearish_count/len(results)*100:.0f}%")
+                with col3:
+                    st.metric("⚖️ Hold Signals", hold_count, delta=f"{hold_count/len(results)*100:.0f}%")
+                with col4:
+                    avg_score = results_df['Signal Score'].mean()
+                    st.metric("📊 Avg Signal Score", f"{avg_score:.1f}/10")
                 
                 st.write("---")
                 
-                # Add portfolio context
-                st.subheader("💼 Portfolio Context")
-                st.write("""
-                **How this analysis fits in your portfolio:**
+                # ===== Signal Table =====
+                st.markdown("### 📋 Portfolio Technical Signals")
                 
-                1. **For Conservative Portfolios:** 
-                   - Technical signals help time bond ETF entries/exits
-                   - Use signals to adjust fixed income duration
-                   
-                2. **For Moderate Portfolios:**
-                   - Balance signals across equity and bond ETFs
-                   - Use crossovers for tactical allocation shifts
-                   
-                3. **For Aggressive Portfolios:**
-                   - Focus on equity ETF signals for growth opportunities
-                   - Use MACD for momentum-based sector rotation
-                """)
+                display_cols = ['Ticker', 'ETF Name', 'Allocation %', 'Current Price', 'Trend', 
+                              'MACD Status', 'MA Status', 'Signal Score', 'Signal']
                 
-                st.info("💡 **Technical Analysis Note:** Technical indicators work best when combined with fundamental analysis. Always consider your risk tolerance and investment goals before making decisions.")
+                display_df = results_df[display_cols].copy()
+                display_df['Allocation %'] = display_df['Allocation %'].apply(lambda x: f"{x:.1f}%")
+                display_df['Current Price'] = display_df['Current Price'].apply(lambda x: f"${x:.2f}")
+                
+                # Color-code the Signal column
+                def color_signal(val):
+                    if 'BUY' in val:
+                        return 'background-color: #d4edda; color: #155724;'
+                    elif 'SELL' in val:
+                        return 'background-color: #f8d7da; color: #721c24;'
+                    else:
+                        return 'background-color: #fff3cd; color: #856404;'
+                
+                st.dataframe(display_df.style.applymap(color_signal, subset=['Signal']), 
+                           use_container_width=True, hide_index=True)
+                
+                st.write("---")
+                
+                # ===== Asset Class Analysis =====
+                st.markdown("### 🏷️ Analysis by Asset Class")
+                
+                # Group by category
+                category_analysis = results_df.groupby('Category').agg({
+                    'Signal Score': 'mean',
+                    'Signal': lambda x: max(x, key=x.value_counts().get)  # Most common signal
+                }).reset_index()
+                
+                category_analysis['Signal Score'] = category_analysis['Signal Score'].apply(lambda x: f"{x:.1f}/10")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Bar chart of signal scores by category
+                    fig = px.bar(category_analysis, x='Category', y='Signal Score', 
+                                title='Average Signal Score by Asset Class',
+                                color='Category', 
+                                color_discrete_sequence=px.colors.qualitative.Set2)
+                    fig.update_layout(height=300)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Pie chart of signals by category
+                    category_counts = results_df.groupby(['Category', 'Signal']).size().reset_index(name='Count')
+                    fig = px.sunburst(category_counts, path=['Category', 'Signal'], values='Count',
+                                     title='Signal Distribution by Asset Class')
+                    fig.update_layout(height=300)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                st.write("---")
+                
+                # ===== Rebalancing Suggestions =====
+                st.markdown("### 🔄 Rebalancing Suggestions")
+                
+                suggestions = []
+                
+                for _, row in results_df.iterrows():
+                    ticker = row['Ticker']
+                    signal = row['Signal']
+                    allocation = row['Allocation %']
+                    score = row['Signal Score']
+                    
+                    if 'BUY' in signal:
+                        if allocation < 15:  # Underweight
+                            suggestions.append({
+                                'Ticker': ticker,
+                                'Action': '🟢 Increase',
+                                'Current Allocation': f"{allocation:.1f}%",
+                                'Suggested Change': f"+{min(5, 15 - allocation):.1f}%",
+                                'Reason': f"Bullish signal (score: {score})"
+                            })
+                    elif 'SELL' in signal:
+                        if allocation > 10:  # Overweight
+                            suggestions.append({
+                                'Ticker': ticker,
+                                'Action': '🔴 Decrease',
+                                'Current Allocation': f"{allocation:.1f}%",
+                                'Suggested Change': f"-{min(5, allocation - 10):.1f}%",
+                                'Reason': f"Bearish signal (score: {score})"
+                            })
+                
+                if suggestions:
+                    suggestion_df = pd.DataFrame(suggestions)
+                    st.dataframe(suggestion_df, use_container_width=True, hide_index=True)
+                    
+                    st.info("💡 **Note:** These are suggested adjustments based on technical signals. Always consider your risk tolerance and investment goals.")
+                else:
+                    st.success("✅ Your portfolio is well-aligned with current technical signals. No major rebalancing needed.")
+                
+                st.write("---")
+                
+                # ===== Download Report =====
+                st.markdown("### 📥 Export Technical Analysis")
+                
+                csv = results_df.to_csv(index=False)
+                st.download_button(
+                    label="📊 Download Full Technical Analysis Report (CSV)",
+                    data=csv,
+                    file_name=f"portfolio_technical_analysis_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
                 
             else:
-                st.error(f"❌ Failed to fetch data for {ticker}. Please try again later.")
-                st.info("💡 Make sure you have an internet connection and Yahoo Finance is accessible.")
-    
-    else:
-        st.info("👈 Select a security from the dropdown and click 'Analyze Security' to begin technical analysis")
-        
-        st.markdown("""
-        ### 🎯 What this tool provides:
-        
-        **📈 MACD Analysis**
-        - Calculates MACD line, Signal line, and Histogram
-        - Displays interactive chart with crossover markers
-        - Shows recent calculations table (last 10 days)
-        - Provides bullish/bearish interpretation with momentum strength
-        
-        **🟡 Golden Cross vs 🔴 Death Cross**
-        - Detects moving average crossovers (MA 20 & MA 50)
-        - Shows historical crossover events with dates and prices
-        - Visual chart with highlighted crossover regions
-        - Current trend status and signal strength
-        
-        **🎯 Combined Conclusion**
-        - Aggregates both indicators for overall signal
-        - Provides actionable recommendation
-        - Key metrics summary for quick reference
-        
-        ### 📊 Available ETFs for Analysis:
-        **Fixed Income:** BND, SHY, TLT
-        **Equity - US:** VTI, SPY, IWM
-        **Equity - International:** VXUS, EFA
-        **Growth:** QQQ
-        **Commodities:** GLD
-        """)
+                st.error("❌ Failed to analyze portfolio holdings. Please try again.")
 
 # ========== DASHBOARD FUNCTIONS ==========
 def create_dashboard(portfolio_details, allocation_data, sim_stats, initial_amount, investment_years, risk_profile):
@@ -1290,7 +1612,7 @@ def main():
             - ✅ Provide integrated technical analysis for all holdings
             """)
     
-    # Tab 2: Technical Analysis (Standalone)
+    # Tab 2: Technical Analysis (Integrated)
     with tab2:
         technical_analysis_tab()
     

@@ -4,7 +4,7 @@ With Professional Dashboard, Banking Analytics & Integrated Technical Analysis
 Author: Syed Kamran Abbas 
 """
 
-# ========== IMPORT LIBRARIES ==========
+# ========== IMPORT LIBRARIES ===========
 import streamlit as st
 import pandas as pd
 import numpy as np

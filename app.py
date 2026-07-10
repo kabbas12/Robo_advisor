@@ -314,18 +314,28 @@ def get_portfolio_allocation(risk_profile, total_amount):
     return portfolio_details, allocation_data
 
 # ========== MONTE CARLO SIMULATION ==========
-def run_monte_carlo(initial_amount, years, expected_return, volatility, n_sims=5000):
+def run_monte_carlo(initial_amount, years, expected_return, volatility, n_sims=1000):
+    # Reduce simulations to prevent memory issues
     daily_return = expected_return / 252
     daily_vol = volatility / np.sqrt(252)
     
     trading_days = years * 252
     np.random.seed(42)
     
-    random_returns = np.random.normal(daily_return, daily_vol, (trading_days, n_sims))
-    cumulative_returns = np.cumprod(1 + random_returns, axis=0)
-    portfolio_values = initial_amount * cumulative_returns
+    # Use smaller chunk sizes to prevent memory issues
+    chunk_size = min(n_sims, 100)
+    all_paths = []
     
-    final_values = portfolio_values[-1, :]
+    for chunk in range(0, n_sims, chunk_size):
+        current_chunk_size = min(chunk_size, n_sims - chunk)
+        random_returns = np.random.normal(daily_return, daily_vol, (trading_days, current_chunk_size))
+        cumulative_returns = np.cumprod(1 + random_returns, axis=0)
+        portfolio_values = initial_amount * cumulative_returns
+        all_paths.append(portfolio_values)
+    
+    # Combine results
+    combined_results = np.concatenate(all_paths, axis=1)
+    final_values = combined_results[-1, :]
     
     stats = {
         "median": np.median(final_values),
@@ -343,34 +353,43 @@ def run_monte_carlo(initial_amount, years, expected_return, volatility, n_sims=5
         "std_dev": np.std(final_values)
     }
     
-    return portfolio_values, stats
+    return combined_results, stats
 
 # ========== TECHNICAL ANALYSIS FUNCTIONS ==========
 @st.cache_data(ttl=3600)
 def fetch_stock_data(ticker, start_date, end_date):
-    """Fetch stock data from Yahoo Finance"""
+    """Fetch stock data from Yahoo Finance with error handling"""
     try:
+        # Add delay to prevent rate limiting
+        import time
+        time.sleep(0.5)
+        
         stock = yf.Ticker(ticker)
-        data = stock.history(start=start_date, end=end_date)
+        data = stock.history(start=start_date, end=end_date, period="1y")
         if data.empty:
             return None
         return data
     except Exception as e:
+        st.warning(f"Could not fetch data for {ticker}: {str(e)}")
         return None
 
 def calculate_technical_indicators(data, ma_short=20, ma_long=50, macd_fast=12, macd_slow=26, macd_signal=9):
     """Calculate MACD and Golden Cross indicators"""
     df = data.copy()
     
+    # Ensure we have enough data
+    if len(df) < ma_long:
+        return None
+    
     # Moving averages for Golden Cross
-    df['MA_Short'] = df['Close'].rolling(window=ma_short).mean()
-    df['MA_Long'] = df['Close'].rolling(window=ma_long).mean()
+    df['MA_Short'] = df['Close'].rolling(window=ma_short, min_periods=1).mean()
+    df['MA_Long'] = df['Close'].rolling(window=ma_long, min_periods=1).mean()
     
     # MACD calculation
-    df['EMA_Fast'] = df['Close'].ewm(span=macd_fast, adjust=False).mean()
-    df['EMA_Slow'] = df['Close'].ewm(span=macd_slow, adjust=False).mean()
+    df['EMA_Fast'] = df['Close'].ewm(span=macd_fast, adjust=False, min_periods=1).mean()
+    df['EMA_Slow'] = df['Close'].ewm(span=macd_slow, adjust=False, min_periods=1).mean()
     df['MACD'] = df['EMA_Fast'] - df['EMA_Slow']
-    df['Signal_Line'] = df['MACD'].ewm(span=macd_signal, adjust=False).mean()
+    df['Signal_Line'] = df['MACD'].ewm(span=macd_signal, adjust=False, min_periods=1).mean()
     df['MACD_Histogram'] = df['MACD'] - df['Signal_Line']
     
     # Golden Cross signals
@@ -465,13 +484,15 @@ def plot_macd_graph(df, ticker):
     bullish_cross = df[df['MACD_Bullish_Cross'] == True]
     bearish_cross = df[df['MACD_Bearish_Cross'] == True]
     
-    fig.add_trace(go.Scatter(x=bullish_cross.index, y=bullish_cross['MACD'],
-                            mode='markers', name='Bullish Crossover',
-                            marker=dict(color='green', size=10, symbol='triangle-up')), row=2, col=1)
+    if not bullish_cross.empty:
+        fig.add_trace(go.Scatter(x=bullish_cross.index, y=bullish_cross['MACD'],
+                                mode='markers', name='Bullish Crossover',
+                                marker=dict(color='green', size=10, symbol='triangle-up')), row=2, col=1)
     
-    fig.add_trace(go.Scatter(x=bearish_cross.index, y=bearish_cross['MACD'],
-                            mode='markers', name='Bearish Crossover',
-                            marker=dict(color='red', size=10, symbol='triangle-down')), row=2, col=1)
+    if not bearish_cross.empty:
+        fig.add_trace(go.Scatter(x=bearish_cross.index, y=bearish_cross['MACD'],
+                                mode='markers', name='Bearish Crossover',
+                                marker=dict(color='red', size=10, symbol='triangle-down')), row=2, col=1)
     
     # Add zero line
     fig.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
@@ -509,15 +530,17 @@ def plot_golden_death_cross_graph(df, ticker):
     golden_crosses = df[df['Golden_Cross'] == True]
     death_crosses = df[df['Death_Cross'] == True]
     
-    fig.add_trace(go.Scatter(x=golden_crosses.index, y=golden_crosses['Close'],
-                            mode='markers', name='🟢 Golden Cross (BUY)',
-                            marker=dict(color='green', size=14, symbol='triangle-up', 
-                                       line=dict(color='darkgreen', width=2))))
+    if not golden_crosses.empty:
+        fig.add_trace(go.Scatter(x=golden_crosses.index, y=golden_crosses['Close'],
+                                mode='markers', name='🟢 Golden Cross (BUY)',
+                                marker=dict(color='green', size=14, symbol='triangle-up', 
+                                           line=dict(color='darkgreen', width=2))))
     
-    fig.add_trace(go.Scatter(x=death_crosses.index, y=death_crosses['Close'],
-                            mode='markers', name='🔴 Death Cross (SELL)',
-                            marker=dict(color='red', size=14, symbol='triangle-down',
-                                       line=dict(color='darkred', width=2))))
+    if not death_crosses.empty:
+        fig.add_trace(go.Scatter(x=death_crosses.index, y=death_crosses['Close'],
+                                mode='markers', name='🔴 Death Cross (SELL)',
+                                marker=dict(color='red', size=14, symbol='triangle-down',
+                                           line=dict(color='darkred', width=2))))
     
     # Add filled area between MAs when bullish
     bullish_periods = df[df['MA_Short'] > df['MA_Long']]
@@ -580,17 +603,23 @@ def analyze_portfolio_securities(portfolio_details, risk_profile, investment_hor
     
     analysis_results = []
     
-    with st.spinner("Analyzing portfolio securities..."):
-        for security in portfolio_details:
-            ticker = security['Ticker']
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for idx, security in enumerate(portfolio_details):
+        status_text.text(f"Analyzing {security['Ticker']}... ({idx+1}/{len(portfolio_details)})")
+        progress_bar.progress((idx + 1) / len(portfolio_details))
+        
+        ticker = security['Ticker']
+        
+        # Fetch data
+        data = fetch_stock_data(ticker, start_date, end_date)
+        
+        if data is not None and not data.empty and len(data) > 50:
+            # Calculate indicators
+            df_tech = calculate_technical_indicators(data)
             
-            # Fetch data
-            data = fetch_stock_data(ticker, start_date, end_date)
-            
-            if data is not None and not data.empty:
-                # Calculate indicators
-                df_tech = calculate_technical_indicators(data)
-                
+            if df_tech is not None:
                 # Get MACD summary
                 macd_summary = get_macd_analysis_summary(df_tech)
                 
@@ -627,6 +656,7 @@ def analyze_portfolio_securities(portfolio_details, risk_profile, investment_hor
                     "DF_Data": df_tech
                 })
             else:
+                # Skip if technical indicators couldn't be calculated
                 analysis_results.append({
                     "Ticker": ticker,
                     "ETF Name": security['ETF Name'],
@@ -649,6 +679,32 @@ def analyze_portfolio_securities(portfolio_details, risk_profile, investment_hor
                     "Cross_Table": pd.DataFrame(),
                     "DF_Data": None
                 })
+        else:
+            analysis_results.append({
+                "Ticker": ticker,
+                "ETF Name": security['ETF Name'],
+                "Category": security['Category'],
+                "Allocation": security['Allocation %'],
+                "Current Price": 0,
+                "MA_Short": 0,
+                "MA_Long": 0,
+                "Trend": "N/A",
+                "MACD_Value": 0,
+                "Signal_Line": 0,
+                "MACD_Histogram": 0,
+                "MACD_Status": "N/A",
+                "MACD_Hist_Trend": "N/A",
+                "Cross_Status": "N/A",
+                "Cross_Diff": 0,
+                "Total_Golden": 0,
+                "Total_Death": 0,
+                "MACD_Table": pd.DataFrame(),
+                "Cross_Table": pd.DataFrame(),
+                "DF_Data": None
+            })
+    
+    progress_bar.empty()
+    status_text.empty()
     
     return analysis_results
 
@@ -1447,10 +1503,10 @@ def main():
             st.header("📈 Monte Carlo Simulation")
             st.write(f"Projecting ${initial_amount:,} over {investment_years} years with {allocation_data['expected_return']*100:.0f}% expected return")
             
-            with st.spinner(f"Running 5,000 market simulations..."):
+            with st.spinner(f"Running market simulations..."):
                 sim_results, sim_stats = run_monte_carlo(initial_amount, investment_years, 
                                                         allocation_data['expected_return'],
-                                                        allocation_data['expected_volatility'], n_sims=5000)
+                                                        allocation_data['expected_volatility'], n_sims=1000)
             
             col1, col2, col3, col4 = st.columns(4)
             with col1:
@@ -1473,7 +1529,7 @@ def main():
                                     line=dict(color='rgba(255,255,255,0)'), name='25th-75th Percentile'))
             fig.add_trace(go.Scatter(x=days, y=median_path, mode='lines', line=dict(color='red', width=2), name='Median Path'))
             fig.add_hline(y=initial_amount, line_dash="dash", line_color="green", annotation_text="Initial Investment")
-            fig.update_layout(title=f"Portfolio Value Over {investment_years} Years (5,000 Simulations)",
+            fig.update_layout(title=f"Portfolio Value Over {investment_years} Years",
                             xaxis_title="Trading Days", yaxis_title="Portfolio Value ($)", hovermode='x unified', height=500)
             st.plotly_chart(fig, use_container_width=True)
             st.write("---")
@@ -1504,7 +1560,7 @@ def main():
             **This tool will:**
             - ✅ Assess your risk tolerance using 5 professional questions
             - ✅ Build a diversified ETF portfolio using real funds
-            - ✅ Run 5,000 Monte Carlo simulations to project outcomes
+            - ✅ Run Monte Carlo simulations to project outcomes
             - ✅ Show detailed dashboard with risk analytics
             - ✅ Provide integrated technical analysis for all holdings
             """)
@@ -1525,32 +1581,6 @@ def main():
             2. Complete the risk assessment questions
             3. Click 'Generate Portfolio'
             4. Return to this tab to see technical analysis for your portfolio holdings
-            
-            The Technical Analysis will automatically analyze all securities in your portfolio and provide:
-            
-            ### 📊 MACD Analysis:
-            - MACD line, Signal line, and Histogram calculations
-            - Interactive MACD chart with crossover markers
-            - Recent MACD values table (last 10 periods)
-            - Bullish/Bearish signal interpretation
-            
-            ### 🟡 Golden Cross vs 🔴 Death Cross:
-            - Moving Average crossover detection (MA 20 & MA 50)
-            - Historical crossover events table with dates and prices
-            - Visual chart with highlighted crossover regions
-            - Current trend status and signal strength
-            
-            ### 🎯 Individual Security Analysis:
-            - Select any security from your portfolio
-            - View detailed technical metrics
-            - Get personalized buy/hold/sell recommendations
-            - See combined MACD and crossover signals
-            
-            ### 🎯 Portfolio Conclusion:
-            - Aggregated technical signals across all holdings
-            - Weighted recommendation based on your allocation
-            - Actionable buy/sell/hold recommendations
-            - Priority-based action items
             """)
     
     # Tab 3: Education & Resources

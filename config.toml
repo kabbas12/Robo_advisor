@@ -1,0 +1,16 @@
+[theme]
+base = "light"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 10
+
+[runner]
+minCachedSize = 10
+
+[global]
+developmentMode = false
